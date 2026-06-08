@@ -1,0 +1,100 @@
+# ============================================================
+# PropTech PDE — Compose para EASYPANEL
+# Easypanel (Traefik) maneja el ingreso HTTP/HTTPS + dominio + SSL.
+# Por eso este compose NO incluye Nginx ni Certbot ni publica puertos:
+# el dominio se mapea al servicio "frontend" (puerto 3000) desde la UI.
+#
+# En Easypanel: Proyecto → Servicio tipo "Compose" → este archivo.
+# Luego: agregar dominio al servicio `frontend` (Easypanel pone el SSL).
+# ============================================================
+
+services:
+
+  postgres:
+    image: postgis/postgis:15-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-proptech}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-proptech123}
+      POSTGRES_DB: ${POSTGRES_DB:-proptech_pde}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-proptech}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+
+  api:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
+      DATABASE_SYNC_URL: postgresql://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/2
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      ALLOWED_HOSTS: "*"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 120
+
+  worker:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
+      DATABASE_SYNC_URL: postgresql://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/2
+    depends_on:
+      - api
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q scraping,ai,notifications,default
+
+  beat:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
+      CELERY_BROKER_URL: redis://redis:6379/2
+    depends_on:
+      - redis
+    command: celery -A app.workers.celery_app beat --loglevel=info --scheduler redbeat.RedBeatScheduler
+
+  # ⬇️ Este es el servicio al que Easypanel le asigna el DOMINIO (puerto 3000)
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # El navegador usa rutas relativas; Next proxea /api/v1 → api:8000
+      BACKEND_INTERNAL_URL: http://api:8000
+      NEXT_PUBLIC_API_URL: ""
+    depends_on:
+      - api
+    # Usa el CMD del Dockerfile (node server.js — Next standalone)
+
+volumes:
+  postgres_data:
+  redis_data:

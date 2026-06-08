@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Env
+.env
+.env.local
+*.local
+
+# Node
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+
+# Backups
+backups/
+backend/proptech_local.db

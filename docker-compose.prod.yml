@@ -1,0 +1,91 @@
+# ============================================================
+# PropTech PDE — Override de PRODUCCIÓN
+# Uso:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ============================================================
+# Diferencias vs desarrollo:
+#  - Targets de build = production (gunicorn / next build)
+#  - Sin hot-reload ni volúmenes de código montados
+#  - Sin puertos expuestos al host salvo Nginx (80/443)
+#  - Healthchecks y restart policies estrictos
+#  - Certbot para HTTPS (Let's Encrypt)
+
+services:
+
+  postgres:
+    ports: []                       # no exponer DB al exterior
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+  redis:
+    ports: []                       # no exponer Redis al exterior
+
+  api:
+    build:
+      target: production
+    command: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 120 --access-logfile - --error-logfile -
+    volumes:
+      - ./backend/logs:/app/logs    # solo logs, no el código
+    ports: []                       # accesible solo vía Nginx
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+    restart: always
+
+  worker:
+    build:
+      target: production
+    volumes: []
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4 -Q scraping,ai,notifications,default
+    restart: always
+
+  beat:
+    build:
+      target: production
+    volumes: []
+    restart: always
+
+  frontend:
+    build:
+      target: production
+    volumes: []                     # build estático, sin montar código
+    ports: []                       # accesible solo vía Nginx
+    environment:
+      NODE_ENV: production
+      BACKEND_INTERNAL_URL: http://api:8000
+      NEXT_PUBLIC_API_URL: ""
+    restart: always
+    # Usa el CMD del Dockerfile (node server.js — Next standalone)
+
+  nginx:
+    volumes:
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+      - ./docker/certbot/www:/var/www/certbot
+      - ./docker/certbot/conf:/etc/letsencrypt
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: always
+
+  # Renovación automática de certificados Let's Encrypt.
+  # Solo se activa en deploy con dominio (perfil "ssl"); en deploy por IP no corre.
+  certbot:
+    image: certbot/certbot:latest
+    container_name: pde_certbot
+    profiles: ["ssl"]
+    volumes:
+      - ./docker/certbot/www:/var/www/certbot
+      - ./docker/certbot/conf:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done;'"
+    restart: always
+    networks:
+      - proptech_net
+
+  # Servicios solo-internos en prod: deshabilitar exposición de pgadmin/metabase
+  pgadmin:
+    profiles: ["tools"]             # no arranca por defecto en prod
+
+  flower:
+    profiles: ["tools"]
