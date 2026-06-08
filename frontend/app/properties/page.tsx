@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -32,7 +32,7 @@ const SORT_OPTIONS = [
   { value: "price_per_m2_usd:asc", label: "Precio/m²: menor a mayor" },
 ];
 
-export default function PropertiesPage() {
+function PropertiesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -284,6 +284,8 @@ export default function PropertiesPage() {
     </DashboardLayout>
   );
 }
+
+export default function PropertiesPage() { return (<Suspense fallback={null}><PropertiesContent /></Suspense>); }
 
 function FilterBadge({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
