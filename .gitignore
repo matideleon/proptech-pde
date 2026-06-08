@@ -33,3 +33,4 @@ logs/
 # Backups
 backups/
 backend/proptech_local.db
+.github-ci-backup/
