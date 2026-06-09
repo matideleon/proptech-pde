@@ -64,6 +64,8 @@ services:
       DATABASE_SYNC_URL: postgresql://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/2
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
       - api
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q scraping,ai,notifications,default
@@ -75,7 +77,11 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
+      DATABASE_SYNC_URL: postgresql://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
+      REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/2
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
       - redis
     command: celery -A app.workers.celery_app beat --loglevel=info --scheduler redbeat.RedBeatScheduler
