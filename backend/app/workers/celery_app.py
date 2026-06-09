@@ -21,7 +21,7 @@ celery_app = Celery(
     include=[
         "app.workers.tasks.scraping",
         "app.workers.tasks.ai_tasks",
-        "app.workers.tasks.notifications",
+        # "app.workers.tasks.notifications",  # TODO: crear este módulo
     ],
 )
 
