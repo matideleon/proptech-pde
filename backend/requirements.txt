@@ -14,8 +14,7 @@ sqlalchemy[asyncio]==2.0.27
 asyncpg==0.29.0
 psycopg2-binary==2.9.9
 alembic==1.13.1
-GeoAlchemy2==0.14.3
-
+GeoAlchemy2==0.15.2
 # ─── REDIS & CACHING ────────────────────────────────────────
 redis[hiredis]==5.0.1
 aioredis==2.0.1
