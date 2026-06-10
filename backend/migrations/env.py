@@ -25,8 +25,7 @@ target_metadata = Base.metadata
 # URL desde variables de entorno
 def get_url():
     from app.core.config import settings
-    return settings.DATABASE_SYNC_URL
-
+    return settings.DATABASE_URL
 config.set_main_option("sqlalchemy.url", get_url())
 
 
