@@ -87,10 +87,18 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         if is_postgres:
-            # Extensiones solo aplican a PostgreSQL
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
-            await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+            # Extensiones solo aplican a PostgreSQL.
+            # Usamos try/except individual para evitar errores de concurrencia
+            # cuando múltiples workers arrancan en paralelo (ya existen en init.sql).
+            for ext in ("postgis", "pg_trgm", "uuid-ossp"):
+                try:
+                    await conn.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
+                except Exception as e:
+                    logger.warning(
+                        "Extension already exists or could not be created (ignorable)",
+                        extension=ext,
+                        error=str(e),
+                    )
         await conn.run_sync(Base.metadata.create_all)
 
     logger.info("✅ Base de datos inicializada", engine="postgres" if is_postgres else "sqlite")
