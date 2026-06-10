@@ -18,6 +18,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    text,
     Text,
     UniqueConstraint,
     func,
@@ -94,14 +95,7 @@ class Property(UUIDMixin, TimestampMixin, Base):
     # Índices específicos de Postgres (GIST geográfico + GIN full-text en español)
     _pg_indexes = (
         Index("ix_property_location", "location", postgresql_using="gist"),
-        Index(
-            "ix_property_fts",
-            func.to_tsvector(
-                "spanish",
-                func.coalesce("title", "") + " " + func.coalesce("description", ""),
-            ),
-            postgresql_using="gin",
-        ),
+        Index("ix_property_fts", text("to_tsvector('spanish', coalesce(title, '') || ' ' || coalesce(description, ''))"), postgresql_using="gin"),
     )
     __table_args__ = _base_indexes if IS_SQLITE else (_base_indexes + _pg_indexes)
 
