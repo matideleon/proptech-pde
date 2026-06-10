@@ -105,12 +105,6 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute=30),
         "options": {"queue": "default"},
     },
-    # Reporte diario de mercado — 8am
-    "daily-market-report": {
-        "task": "app.workers.tasks.notifications.send_daily_market_report",
-        "schedule": crontab(hour=8, minute=0),
-        "options": {"queue": "notifications"},
-    },
     # Detectar propiedades eliminadas — cada 24h
     "detect-removed": {
         "task": "app.workers.tasks.scraping.detect_removed_properties",
