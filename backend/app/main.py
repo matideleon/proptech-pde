@@ -39,6 +39,17 @@ async def lifespan(app: FastAPI):
     try:
         await init_db()
         logger.info("✅ Base de datos inicializada")
+        # Seed mínimo idempotente: usuario admin + zonas. NO propiedades de
+        # ejemplo (queremos solo datos reales del scraper en prod). Se ejecuta
+        # acá porque el CMD del contenedor (gunicorn) siempre corre el lifespan,
+        # sin depender de que el orquestador respete `command` del compose.
+        try:
+            from app.db.seeds import seed_users, seed_zones
+            await seed_users()
+            await seed_zones()
+            logger.info("✅ Seed mínimo (admin + zonas) OK")
+        except Exception as e:  # noqa: BLE001 — race entre workers es benigna (idempotente)
+            logger.warning("Seed mínimo no aplicado (posible race entre workers)", error=str(e))
     except Exception as e:  # noqa: BLE001
         logger.warning(
             "⚠️  Base de datos no disponible — arrancando en modo degradado",
