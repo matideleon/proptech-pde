@@ -1,0 +1,61 @@
+name: Daily Scrape (Facebook + Gallito)
+
+on:
+  schedule:
+    # 08:00 y 20:00 UTC (05:00 y 17:00 Uruguay)
+    - cron: "0 8,20 * * *"
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "Sources (space-separated, default: facebook gallito)"
+        required: false
+        default: "facebook gallito"
+      all_sources:
+        description: "Scrape ALL sources (mercadolibre + infocasas también)"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements-verified.txt
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements-verified.txt
+
+      - name: Run scrapers & push to prod
+        env:
+          PROD_URL: ${{ secrets.PROD_URL }}
+          ADMIN_PASS: ${{ secrets.ADMIN_PASS }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          # Config para que los scrapers no intenten conectar a DB local
+          DATABASE_URL: "sqlite:///tmp/dummy.db"
+          SECRET_KEY: "github-actions-runner-placeholder-32chars-ok"
+          OPENAI_API_KEY: "unused"
+        run: |
+          SOURCES="${{ github.event.inputs.sources || 'facebook gallito' }}"
+          ALL="${{ github.event.inputs.all_sources }}"
+
+          if [ "$ALL" = "true" ]; then
+            python scripts/remote_scrape.py --all
+          else
+            python scripts/remote_scrape.py --sources $SOURCES
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Scraping job failed. Check logs above."

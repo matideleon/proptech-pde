@@ -1,6 +1,6 @@
 """Endpoints para control del sistema de scraping."""
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -159,3 +159,120 @@ async def get_scraping_status(
         "sources": sources_status,
         "available_scrapers": list(SCRAPERS.keys()),
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Push-batch: recibe propiedades ya scrapeadas desde un runner externo
+# (p.ej. GitHub Actions) y las persiste en la DB de prod.
+# ──────────────────────────────────────────────────────────────────────────────
+
+class RemoteProperty(BaseModel):
+    source: str
+    external_id: Optional[str] = None
+    url: str = ""
+    property_type: str = "apartamento"
+    operation: str = "alquiler"
+    title: str = ""
+    description: str = ""
+    price: Optional[float] = None
+    currency: str = "USD"
+    price_usd: Optional[float] = None
+    price_per_m2_usd: Optional[float] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    garages: Optional[int] = None
+    area_total: Optional[float] = None
+    area_built: Optional[float] = None
+    floor: Optional[int] = None
+    year_built: Optional[int] = None
+    country: str = "Uruguay"
+    department: str = "Maldonado"
+    city: str = "Punta del Este"
+    neighborhood: Optional[str] = None
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    agency_name: Optional[str] = None
+    agency_id: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_whatsapp: Optional[str] = None
+    images: List[str] = []
+    amenities: List[str] = []
+    published_at: Optional[datetime] = None
+    raw_data: Dict[str, Any] = {}
+
+
+class PushBatchRequest(BaseModel):
+    properties: List[RemoteProperty]
+
+
+class PushBatchResponse(BaseModel):
+    received: int
+    new: int
+    updated: int
+    skipped: int
+    errors: int
+
+
+@router.post("/push-batch", response_model=PushBatchResponse)
+async def push_batch(
+    request: PushBatchRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """
+    Recibe propiedades scrapeadas externamente y las persiste/actualiza en DB.
+    Usado por GitHub Actions para correr scrapers en IPs no bloqueadas.
+    """
+    from app.scrapers.base import ScrapedProperty
+    from app.scrapers.runner import ScrapingRunner
+    from app.scrapers.config import TARGET
+    from app.scrapers.normalizer import normalizer
+
+    runner = ScrapingRunner()
+    skipped = errors = 0
+
+    # Agrupar por fuente para crear un ScrapingRun por fuente
+    by_source: Dict[str, List[RemoteProperty]] = {}
+    for p in request.properties:
+        by_source.setdefault(p.source, []).append(p)
+
+    total_new = total_updated = 0
+
+    for source, props in by_source.items():
+        run = ScrapingRun(source=source, status=ScrapingStatus.RUNNING)
+        db.add(run)
+        await db.flush()
+
+        for rp in props:
+            try:
+                scraped = ScrapedProperty(**rp.model_dump(exclude_none=False))
+                normalized = normalizer.normalize(scraped)
+
+                if normalized.operation == "alquiler":
+                    price_for_filter = normalized.price_usd or normalized.price
+                    cur = "USD" if normalized.price_usd else normalized.currency
+                    if not TARGET.price_in_rent_range(price_for_filter, cur):
+                        skipped += 1
+                        continue
+
+                await runner._upsert_property(normalized, db, run)
+            except Exception as e:
+                errors += 1
+                runner.logger.error("push-batch upsert error", error=str(e))
+
+        run.status = ScrapingStatus.COMPLETED
+        run.finished_at = datetime.now()
+        total_new += run.properties_new
+        total_updated += run.properties_updated
+        await db.commit()
+
+    return PushBatchResponse(
+        received=len(request.properties),
+        new=total_new,
+        updated=total_updated,
+        skipped=skipped,
+        errors=errors,
+    )
