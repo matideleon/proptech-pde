@@ -37,8 +37,11 @@ FROM dependencies AS production
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app
+# Ruta compartida de los navegadores: se instalan como root acá y el usuario
+# de runtime (appuser) los lee desde la misma ubicación.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-RUN playwright install chromium
+RUN playwright install chromium && chmod -R a+rx /ms-playwright
 
 COPY . .
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
