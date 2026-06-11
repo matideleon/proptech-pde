@@ -30,7 +30,7 @@ router = APIRouter(prefix="/properties", tags=["properties"])
 logger = get_logger("api.properties")
 
 
-@router.get("/", response_model=PaginatedResponse)
+@router.get("", response_model=PaginatedResponse)
 async def list_properties(
     q: Optional[str] = Query(None, description="Búsqueda de texto"),
     property_type: Optional[List[str]] = Query(None),
