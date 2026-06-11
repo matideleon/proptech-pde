@@ -158,13 +158,16 @@ class GallitoScraper(BaseScraper):
             else:
                 ptype = "apartamento"
 
-            # Imagen
-            img_el = art.select_one("img")
+            # Imagen — buscar la foto real (evitar SVG placeholder superdestaque)
             images: List[str] = []
-            if img_el:
+            for img_el in art.select("img"):
                 src = img_el.get("data-src") or img_el.get("src") or ""
-                if src.startswith("http") and "no-disponible" not in src:
+                if (src.startswith("http")
+                        and "no-disponible" not in src
+                        and ".svg" not in src
+                        and "superdestaque" not in src):
                     images = [src]
+                    break
 
             return ScrapedProperty(
                 source=self.SOURCE_NAME,
