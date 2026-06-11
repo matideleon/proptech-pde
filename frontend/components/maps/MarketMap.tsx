@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Property } from "@/types/property";
+import { Property } from "@/lib/api";
 
 interface MarketMapProps {
   properties: Property[];

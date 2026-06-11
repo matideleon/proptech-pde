@@ -221,7 +221,7 @@ function PropertiesContent() {
         {/* Content */}
         {viewMode === "map" ? (
           <div className="rounded-xl border overflow-hidden" style={{ height: 600 }}>
-            <MarketMap />
+            <MarketMap properties={data?.items || []} mode="clusters" />
           </div>
         ) : (
           <>

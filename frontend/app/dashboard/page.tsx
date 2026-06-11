@@ -145,7 +145,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <Suspense fallback={<div className="h-full skeleton" />}>
-                <MarketMap />
+                <MarketMap properties={recentProperties?.items || []} mode="heatmap" />
               </Suspense>
             </div>
           </div>
