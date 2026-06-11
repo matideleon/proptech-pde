@@ -82,11 +82,24 @@ class Settings(BaseSettings):
     FACEBOOK_SESSION_FILE: Optional[str] = None
 
     # ─── GRUPOS DE FACEBOOK (alquileres ofrecidos/solicitados) ──
-    # Sesión del usuario para leer grupos privados. Formato de header Cookie:
-    #   "c_user=100xxxx; xs=xx%3A...; ..."  (extraída del navegador logueado).
+    # Sesión del usuario para leer grupos privados. Dos formas:
+    #  (a) FB_SESSION_COOKIE = header Cookie completo "c_user=...; xs=...".
+    #  (b) FB_C_USER + FB_XS por separado (recomendado: valores "limpios" sin
+    #      espacios ni ';' que rompen el parseo de env en algunos orquestadores).
     FB_SESSION_COOKIE: Optional[str] = None
+    FB_C_USER: Optional[str] = None
+    FB_XS: Optional[str] = None
     # IDs o slugs de los grupos a monitorear, separados por coma.
     FB_GROUP_IDS: str = ""
+
+    @property
+    def fb_session_cookie(self) -> str:
+        """Header Cookie de Facebook, desde FB_SESSION_COOKIE o FB_C_USER+FB_XS."""
+        if self.FB_SESSION_COOKIE and self.FB_SESSION_COOKIE.strip():
+            return self.FB_SESSION_COOKIE.strip()
+        if self.FB_C_USER and self.FB_XS:
+            return f"c_user={self.FB_C_USER.strip()}; xs={self.FB_XS.strip()}"
+        return ""
 
     @property
     def fb_group_ids_list(self) -> List[str]:

@@ -49,6 +49,8 @@ services:
       ALLOWED_HOSTS: "*"
       # Grupos de Facebook (alquileres ofrecidos/solicitados) + IA opcional
       FB_SESSION_COOKIE: ${FB_SESSION_COOKIE:-}
+      FB_C_USER: ${FB_C_USER:-}
+      FB_XS: ${FB_XS:-}
       FB_GROUP_IDS: ${FB_GROUP_IDS:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
@@ -74,6 +76,8 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-this_is_a_jwt_placeholder_of_at_least_32_chars}
       # Grupos de Facebook — el worker ejecuta la tarea programada cada 2h
       FB_SESSION_COOKIE: ${FB_SESSION_COOKIE:-}
+      FB_C_USER: ${FB_C_USER:-}
+      FB_XS: ${FB_XS:-}
       FB_GROUP_IDS: ${FB_GROUP_IDS:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:

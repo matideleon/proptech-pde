@@ -162,6 +162,11 @@ async def log_requests(request: Request, call_next):
 # ─── RUTAS ────────────────────────────────────────────────────
 app.include_router(api_router)
 
+# Dashboard público de nuevas propiedades (HTML en /nuevas, sin prefijo)
+from app.web_dashboard import router as dashboard_router  # noqa: E402
+
+app.include_router(dashboard_router)
+
 
 # ─── HEALTH CHECK ─────────────────────────────────────────────
 @app.get("/health", tags=["system"])

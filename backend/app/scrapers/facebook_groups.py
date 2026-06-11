@@ -52,7 +52,7 @@ class FacebookGroupScraper:
         group_ids: Optional[List[str]] = None,
         max_posts_per_group: int = 40,
     ):
-        self.session_cookie = (session_cookie or settings.FB_SESSION_COOKIE or "").strip()
+        self.session_cookie = (session_cookie or settings.fb_session_cookie or "").strip()
         raw_groups = group_ids if group_ids is not None else settings.fb_group_ids_list
         self.group_ids = [g.strip() for g in raw_groups if g.strip()]
         self.max_posts_per_group = max_posts_per_group
@@ -101,10 +101,20 @@ class FacebookGroupScraper:
     async def diagnose(self, group_id: Optional[str] = None) -> dict:
         """Fetch de un grupo devolviendo qué respondió FB (para diagnóstico)."""
         gid = group_id or (self.group_ids[0] if self.group_ids else None)
+        # Estado de configuración (sin exponer valores secretos)
+        cfg = {
+            "cookie_present": bool(self.session_cookie),
+            "cookie_len": len(self.session_cookie),
+            "has_c_user": "c_user=" in self.session_cookie,
+            "has_xs": "xs=" in self.session_cookie,
+            "source_combined": bool(settings.FB_SESSION_COOKIE and settings.FB_SESSION_COOKIE.strip()),
+            "source_split": bool(settings.FB_C_USER and settings.FB_XS),
+            "group_count": len(self.group_ids),
+        }
         if not self.session_cookie:
-            return {"error": "FB_SESSION_COOKIE vacía"}
+            return {"error": "FB_SESSION_COOKIE vacía", "config": cfg}
         if not gid:
-            return {"error": "FB_GROUP_IDS vacío"}
+            return {"error": "FB_GROUP_IDS vacío", "config": cfg}
 
         url = f"{MBASIC}/groups/{gid}"
         session = await self._get_session()

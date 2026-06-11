@@ -21,7 +21,7 @@ celery_app = Celery(
     include=[
         "app.workers.tasks.scraping",
         "app.workers.tasks.ai_tasks",
-        # "app.workers.tasks.notifications",  # TODO: crear este módulo
+        "app.workers.tasks.notify",
     ],
 )
 
@@ -46,6 +46,7 @@ celery_app.conf.task_routes = {
     "app.workers.tasks.scraping.*": {"queue": "scraping"},
     "app.workers.tasks.ai_tasks.*": {"queue": "ai"},
     "app.workers.tasks.notifications.*": {"queue": "notifications"},
+    "app.workers.tasks.notify.*": {"queue": "notifications"},
 }
 
 # ─── SETTINGS ─────────────────────────────────────────────────
@@ -117,5 +118,11 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.scraping.detect_removed_properties",
         "schedule": crontab(hour=3, minute=0),
         "options": {"queue": "scraping"},
+    },
+    # Digest diario de nuevas propiedades por WhatsApp — 7:00 America/Montevideo
+    "daily-new-digest": {
+        "task": "app.workers.tasks.notify.daily_new_digest",
+        "schedule": crontab(hour=7, minute=0),
+        "options": {"queue": "notifications"},
     },
 }

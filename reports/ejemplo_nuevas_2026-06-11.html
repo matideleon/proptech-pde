@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nuevas propiedades · Punta del Este</title>
+<style>
+  :root {
+    --bg:#0b0f17; --panel:#121826; --panel2:#1a2335; --line:#233047;
+    --txt:#e7ecf5; --muted:#8b9bb4; --accent:#38bdf8; --accent2:#22c55e;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:radial-gradient(1200px 600px at 80% -10%, #16233b 0%, var(--bg) 55%);
+    color:var(--txt); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1180px; margin:0 auto; padding:40px 24px 80px; }
+  header.top { display:flex; justify-content:space-between; align-items:flex-end;
+    gap:24px; flex-wrap:wrap; margin-bottom:28px; }
+  .brand { font-size:13px; letter-spacing:3px; text-transform:uppercase; color:var(--accent);
+    font-weight:700; }
+  h1 { margin:6px 0 4px; font-size:34px; letter-spacing:-.5px; }
+  .sub { color:var(--muted); font-size:14px; }
+  .hero-count { text-align:right; }
+  .hero-count .big { font-size:56px; font-weight:800; line-height:1;
+    background:linear-gradient(135deg,#38bdf8,#22c55e); -webkit-background-clip:text;
+    background-clip:text; color:transparent; }
+  .hero-count .lbl { color:var(--muted); font-size:13px; text-transform:uppercase;
+    letter-spacing:1.5px; }
+
+  .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:14px; margin-bottom:28px; }
+  .metric { background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:18px 20px; }
+  .metric .k { color:var(--muted); font-size:12px; text-transform:uppercase;
+    letter-spacing:1px; margin-bottom:10px; }
+  .chip { display:inline-block; background:var(--panel2); border:1px solid var(--line);
+    color:var(--txt); border-radius:999px; padding:5px 11px; font-size:13px; margin:3px 4px 0 0; }
+  .chip b { color:var(--accent); }
+  .metric .val { font-size:22px; font-weight:700; }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:18px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:18px;
+    overflow:hidden; text-decoration:none; color:inherit; display:flex; flex-direction:column;
+    transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+  .card:hover { transform:translateY(-4px); border-color:var(--accent);
+    box-shadow:0 18px 40px -18px rgba(56,189,248,.5); }
+  .thumb { height:170px; background-size:cover; background-position:center;
+    background-color:var(--panel2); }
+  .thumb-empty { display:flex; align-items:center; justify-content:center; color:var(--muted);
+    font-size:13px; }
+  .card-body { padding:14px 16px 16px; display:flex; flex-direction:column; gap:6px; }
+  .row-top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .badge-op { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted);
+    font-weight:600; }
+  .badge-src { font-size:11px; font-weight:700; color:var(--c); border:1px solid var(--c);
+    padding:2px 8px; border-radius:999px; }
+  .price { font-size:23px; font-weight:800; letter-spacing:-.3px; }
+  .ptype { color:var(--muted); font-size:12.5px; }
+  .title { font-size:14px; font-weight:600; line-height:1.35; max-height:2.7em; overflow:hidden;
+    margin-top:2px; }
+  .loc { color:var(--muted); font-size:12.5px; }
+  .specs { display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; }
+  .spec { font-size:12.5px; color:var(--txt); background:var(--panel2);
+    border:1px solid var(--line); border-radius:8px; padding:3px 8px; }
+  .ai-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:2px; }
+  .ai { font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; }
+  .ai-premium { background:rgba(250,204,21,.15); color:#facc15; }
+  .ai-opp { background:rgba(56,189,248,.15); color:#38bdf8; }
+  .ai-under { background:rgba(34,197,94,.15); color:#22c55e; }
+  .ai-score { background:rgba(129,140,248,.15); color:#a5b4fc; }
+  .empty { grid-column:1/-1; text-align:center; color:var(--muted); padding:80px 0;
+    font-size:16px; }
+  footer { margin-top:50px; color:var(--muted); font-size:12.5px; text-align:center;
+    border-top:1px solid var(--line); padding-top:22px; }
+  a.api { color:var(--accent); text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="brand">PropTech PDE · Punta del Este</div>
+      <h1>Nuevas propiedades</h1>
+      <div class="sub">Detectadas en las últimas 24 h · generado Thursday 11/06/2026 · 07:42 (Montevideo)</div>
+    </div>
+    <div class="hero-count">
+      <div class="big">10</div>
+      <div class="lbl">nuevas hoy</div>
+    </div>
+  </header>
+
+  <section class="metrics">
+    <div class="metric"><div class="k">Por fuente</div><div><span class="chip"><b>10</b> InfoCasas</span></div></div>
+    <div class="metric"><div class="k">Por operación</div><div><span class="chip"><b>10</b> Alquiler</span></div></div>
+    <div class="metric"><div class="k">Rango de precios</div><div class="val">U$S 625 – U$S 2.000</div></div>
+    <div class="metric"><div class="k">Zonas con más altas</div><div><span class="chip"><b>5</b> La Barra</span><span class="chip"><b>2</b> Playa Brava</span><span class="chip"><b>2</b> Punta del Este Centro</span><span class="chip"><b>1</b> La Juanita</span></div></div>
+  </section>
+
+  <section class="grid">
+    
+    <a class="card" href="https://www.infocasas.com.uy/alquiler-casa-dos-dormitorios-santa-monica-jose-ignacio/190114558" target="_blank" rel="noopener">
+      <div class="thumb" style="background-image:url('https://cdn1.infocasas.com.uy/web/6823aa97a7eeb_infocdn.jpg')"></div>
+      <div class="card-body">
+        <div class="row-top">
+          <span class="badge-op">Alquiler</span>
+          <span class="badge-src" style="--c:#22c55e">InfoCasas</span>
+        </div>
+        <div class="price">U$S 995</div>
+        <div class="ptype">Casa · U$S 7/m²</div>
+        <div class="title">Alquiler Casa Dos dormitorios Santa Monica, Jose Ignacio</div>
+        <div class="loc">📍 La Barra · Punta del Este</div>
+        <div class="specs"><span class="spec">🛏 2</span><span class="spec">🛁 2</span><span class="spec">📐 133 m²</span></div>
+        <div class="ai-row"></div>
+      </div>
+    </a>
+    <a class="card" href="https://www.infocasas.com.uy/alquiler-anual-centro-de-maldonado/193585710" target="_blank" rel="noopener">
+      <div class="thumb" style="background-image:url('https://cdn1.infocasas.com.uy/repo/img/277358_OJD-41453-TRA_374.jpg')"></div>
+      <div class="card-body">
+        <div class="row-top">
+          <span class="badge-op">Alquiler</span>
+          <span class="badge-src" style="--c:#22c55e">InfoCasas</span>
+        </div>
+        <div class="price">$ 625</div>
+        <div class="ptype">Apartamento</div>
+        <div class="title">Alquiler anual , centro de maldonado</div>
+        <div class="loc">📍 La Barra · Punta del Este</div>
+        <div class="specs"><span class="spec">🛏 1</span><span class="spec">🛁 1</span></div>
+        <div class="ai-row"></div>
+      </div>
+    </a>
+    <a class="card" href="https://www.infocasas.com.uy/apartamento-playa-brava/190179671" target="_blank" rel="noopener">
+      <div class="thumb" style="background-image:url('https://cdn1.infocasas.com.uy/web/655314de590d1_infocdn.jpg')"></div>
+      <div class="card-body">
+        <div class="row-top">
+          <span class="badge-op">Alquiler</span>
+          <span class="badge-src" style="--c:#22c55e">InfoCasas</span>
+        </div>
+        <div class="price">U$S 750</div>
+        <div class="ptype">Apartamento · U$S 16/m²</div>
+        <div class="title">Apartamento - Playa Brava</div>
+        <div class="loc">📍 Playa Brava · Punta del Este</div>
+        <div class="specs"><span class="spec">🛏 1</span><span class="spec">🛁 1</span><span class="spec">📐 47 m²</span></div>
+        <div class="ai-row"></div>
+      </div>
+    </a>
+    <a class="card" href="https://www.infocasas.com.uy/hermoso-apartamento-proximo-al-puerto/193361071" target="_blank" rel="noopener">
+      <div class="thumb" style="background-image:url('https://cdn1.infocasas.com.uy/web/69844c6a9d55f_infocdn.jpg')"></div>
+      <div class="card-body">
+        <div class="row-top">
+          <span class="badge-op">Alquiler</span>
+          <span class="badge-src" style="--c:#22c55e">InfoCasas</span>
+        </div>
+        <div class="price">U$S 1.900</div>
+        <div class="ptype">Apartamento · U$S 29/m²</div>
+        <div class="title">Hermoso apartamento próximo al puerto</div>
+        <div class="loc">📍 Punta del Este Centro · Punta del Este</div>
+        <div class="specs"><span class="spec">🛏 2</span><span class="spec">🛁 2</span><span class="spec">📐 65 m²</span></div>
+        <div class="ai-row"></div>
+      </div>
+    </a>
+    <a class="card" href="https://www.infocasas.com.uy/zona-nuevo-shopping/193521020" target="_blank" rel="noopener">
+      <div class="thumb" style="background-image:url('https://cdn1.infocasas.com.uy/repo/img/599681_FDE-1380-TRA_635.jpg')"></div>
+      <div class="card-body">
+        <div class="row-top">
+          <span class="badge-op">Alquiler</span>
+          <span class="badge-src" style="--c:#22c55e">InfoCasas</span>
+        </div>
+        <div class="price">U$S 1.600</div>
+        <div class="ptype">Casa · U$S 28/m²</div>
+        <div class="title">Zona nuevo Shopping</div>
+        <div class="loc">📍 La Barra · Punta del Este</div>
+        <div class="specs"><span class="spec">🛏 2</span><span class="spec">🛁 2</span><span class="spec">📐 58 m²</span></div>
+        <div class="ai-row"></div>
+      </div>
+    </a>
+    <a class="card" href="https://www.infocasas.com.uy/atlantico-shopping-mono-ambiente-en-alquiler/193465267" target="_blank" rel="noopener">
+      <div class="thumb" style="background-image:url('https://cdn1.infocasas.com.uy/repo/img/197419_ADD-5352-TRA_695.jpg')"></div>
+      <div class="card-body">
+        <div class="row-top">
+          <span class="badge-op">Alquiler</span>
+          <span class="badge-src" style="--c:#22c55e">InfoCasas</span>
+        </div>
+        <div class="price">$ 675</div>
+        <div class="ptype">Apartamento · U$S 24/m²</div>
+        <div class="title">Atlantico shopping mono ambiente en alquiler</div>
+        <div class="loc">📍 La Barra · Punta del Este</div>
+        <div class="specs"><span class="spec">🛏 0</span><span class="spec">🛁 1</span><span class="spec">📐 28 m²</span></div>
+        <div class="ai-row"></div>
+      </div>
+    </a>
+    <a class="card" href="https://www.infocasas.com.uy/moderna-casa-en-la-juanita-3-dormitorios/193512030" target="_blank" rel="noopener">
+      <div class="thumb" style="background-image:url('https://cdn1.infocasas.com.uy/repo/img/173211400_SPP-15896-TRA_831.jpg')"></div>
+      <div class="card-body">
+        <div class="row-top">
+          <span class="badge-op">Alquiler</span>
+          <span class="badge-src" style="--c:#22c55e">InfoCasas</span>
+        </div>
+        <div class="price">U$S 2.000</div>
+        <div class="ptype">Casa · U$S 18/m²</div>
+        <div class="title">Moderna casa en la juanita 3 dormitorios</div>
+        <div class="loc">📍 La Juanita · Punta del Este</div>
+        <div class="specs"><span class="spec">🛏 3</span><span class="spec">🛁 2</span><span class="spec">📐 110 m²</span></div>
+        <div class="ai-row"></div>
+      </div>
+    </a>
+    <a class="card" href="https://www.infocasas.com.uy/apartamento-en-alquiler-temporal-2-dormitorios-playa-brava/192635214" target="_blank" rel="noopener">
+      <div class="thumb" style="background-image:url('https://cdn1.infocasas.com.uy/web/6874d6633eacd_infocdn.jpg')"></div>
+      <div class="card-body">
+        <div class="row-top">
+          <span class="badge-op">Alquiler</span>
+          <span class="badge-src" style="--c:#22c55e">InfoCasas</span>
+        </div>
+        <div class="price">U$S 1.400</div>
+        <div class="ptype">Apartamento · U$S 14/m²</div>
+        <div class="title">Apartamento en alquiler temporal 2 dormitorios Playa Brava</div>
+        <div class="loc">📍 Playa Brava · Punta del Este</div>
+        <div class="specs"><span class="spec">🛏 2</span><span class="spec">🛁 2</span><span class="spec">📐 100 m²</span></div>
+        <div class="ai-row"></div>
+      </div>
+    </a>
+    <a class="card" href="https://www.infocasas.com.uy/bpvbpv11007-apartamento-en-alquiler-2-dormitorios/193448677" target="_blank" rel="noopener">
+      <div class="thumb" style="background-image:url('https://cdn1.infocasas.com.uy/repo/img/279_BPV-BPV-11007_163.jpg')"></div>
+      <div class="card-body">
+        <div class="row-top">
+          <span class="badge-op">Alquiler</span>
+          <span class="badge-src" style="--c:#22c55e">InfoCasas</span>
+        </div>
+        <div class="price">U$S 1.800</div>
+        <div class="ptype">Apartamento · U$S 20/m²</div>
+        <div class="title">(BPV-BPV-11007) Apartamento EN alquiler 2 DORMITORIOS</div>
+        <div class="loc">📍 Punta del Este Centro · Punta del Este</div>
+        <div class="specs"><span class="spec">🛏 2</span><span class="spec">🛁 2</span><span class="spec">📐 90 m²</span></div>
+        <div class="ai-row"></div>
+      </div>
+    </a>
+    <a class="card" href="https://www.infocasas.com.uy/alquiler-anual-dos-dormitorios-en-maldonado/193833018" target="_blank" rel="noopener">
+      <div class="thumb" style="background-image:url('https://cdn1.infocasas.com.uy/repo/img/173211400_SPP-17201-TRA_392.jpg')"></div>
+      <div class="card-body">
+        <div class="row-top">
+          <span class="badge-op">Alquiler</span>
+          <span class="badge-src" style="--c:#22c55e">InfoCasas</span>
+        </div>
+        <div class="price">$ 800</div>
+        <div class="ptype">Apartamento</div>
+        <div class="title">Alquiler anual dos dormitorios en Maldonado</div>
+        <div class="loc">📍 La Barra · Punta del Este</div>
+        <div class="specs"><span class="spec">🛏 2</span><span class="spec">🛁 1</span></div>
+        <div class="ai-row"></div>
+      </div>
+    </a>
+  </section>
+
+  <footer>
+    PropTech PDE — Inteligencia inmobiliaria de Punta del Este ·
+    Datos vía <a class="api" href="https://dynamiclabsai.com/api/v1/properties">API</a>
+  </footer>
+</div>
+</body>
+</html>
