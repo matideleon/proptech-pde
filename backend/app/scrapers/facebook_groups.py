@@ -234,13 +234,40 @@ class FacebookGroupScraper:
                 return m.group(1)
         return None
 
+    # Markers de UI que indican que un item NO es un post real.
+    _UI_NOISE = (
+        "Escribe algo", "Crear publicación", "ORDENAR", "Grupo público",
+        "Grupo privado", "Invitar", "Actividad reciente", "Videos Comunicados",
+        "miembros", "Unirte al grupo", "Sugerencias",
+    )
+
+    @staticmethod
+    def _clean_post_text(text: str) -> str:
+        """Limpia el texto de un post: glifos de iconos, footer y timestamps."""
+        # Quitar glifos de la Private Use Area (iconos de la fuente de FB)
+        text = "".join(
+            c for c in text
+            if not ("" <= c <= "" or "\U000f0000" <= c <= "\U0010ffff")
+        )
+        # Cortar el footer de interacción
+        for marker in ("Ver publicación", "Me gusta Comentar", "Comentar Compartir",
+                       "Ver más comentarios", "Todas las reacciones", "Comentar como"):
+            i = text.find(marker)
+            if i > 0:
+                text = text[:i]
+        # Quitar tokens de UI y timestamps sueltos
+        text = re.sub(
+            r"(Seguir|Colaborador (?:en ascenso|destacado)|Hace un momento|"
+            r"Me gusta|Comentar|Compartir|Reacciona|Ver traducción)", " ", text)
+        text = re.sub(r"\b\d+\s*(?:min|h|d|sem|año|años)\b", " ", text)
+        return re.sub(r"\s+", " ", text).strip()
+
     def _parse_posts(self, html: str, group_id: str) -> List[dict]:
-        """Extrae posts crudos del feed mbasic. Defensivo: varios fallbacks."""
+        """Extrae posts del feed renderizado de m.facebook.com (MComponent)."""
         soup = BeautifulSoup(html, "lxml")
         posts: List[dict] = []
 
-        # m.facebook.com renderiza el feed como hijos directos de un "vscroller"
-        # (framework MComponent). Fallback a markup clásico por si cambia.
+        # m.facebook.com renderiza el feed como hijos directos de un "vscroller".
         articles = (
             soup.select('[data-type="vscroller"] > div')
             or soup.find_all("article")
@@ -250,13 +277,12 @@ class FacebookGroupScraper:
 
         seen_text = set()
         for art in articles:
-            text = art.get_text(" ", strip=True)
-            if not text or len(text) < 25:
+            raw = art.get_text(" ", strip=True)
+            if not raw or any(ui in raw[:80] for ui in self._UI_NOISE):
                 continue
-            # Descartar items de UI que no son posts (composer, encabezado, etc.)
-            if any(ui in text[:60] for ui in ("Escribe algo", "Crear publicación", "ORDENAR")):
-                # quitar el prefijo de UI del feed si quedó pegado
-                pass
+            text = self._clean_post_text(raw)
+            if len(text) < 25:
+                continue
             # Dedup dentro de la misma página
             key = text[:80]
             if key in seen_text:
