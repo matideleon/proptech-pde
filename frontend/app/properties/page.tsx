@@ -86,7 +86,10 @@ function PropertiesContent() {
       } else {
         params.set(key, String(value));
       }
-      params.set("page", "1");
+      // Solo resetear a página 1 cuando se cambia un filtro, no cuando se cambia la página
+      if (key !== "page") {
+        params.set("page", "1");
+      }
       router.push(`/properties?${params.toString()}`);
     },
     [searchParams, router]
