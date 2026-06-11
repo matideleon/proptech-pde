@@ -98,6 +98,54 @@ class FacebookGroupScraper:
         if self._session and not self._session.closed:
             await self._session.close()
 
+    # ─── NAVEGADOR (Playwright) ──────────────────────────────
+    # m.facebook.com carga el feed por JS, así que para grupos usamos un
+    # navegador headless que renderiza la página antes de parsear.
+    def _browser_cookies(self) -> List[dict]:
+        cookies = []
+        for part in self.session_cookie.split(";"):
+            if "=" in part:
+                name, _, val = part.strip().partition("=")
+                if name and val:
+                    cookies.append({
+                        "name": name.strip(), "value": val.strip(),
+                        "domain": ".facebook.com", "path": "/",
+                    })
+        return cookies
+
+    async def _fetch_browser(self, gid: str, scrolls: int = 4) -> Optional[str]:
+        """Renderiza m.facebook.com/groups/{gid} con Chromium y devuelve el HTML."""
+        try:
+            from playwright.async_api import async_playwright
+        except Exception as e:  # noqa: BLE001
+            logger.error("Playwright no disponible", error=str(e))
+            return None
+
+        url = f"https://m.facebook.com/groups/{gid}"
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+            )
+            try:
+                ctx = await browser.new_context(
+                    user_agent=_MOBILE_UA, locale="es-UY",
+                    viewport={"width": 412, "height": 900},
+                )
+                await ctx.add_cookies(self._browser_cookies())
+                page = await ctx.new_page()
+                await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                try:
+                    await page.wait_for_selector('div[role="article"], article', timeout=15000)
+                except Exception:  # noqa: BLE001
+                    pass
+                for _ in range(scrolls):
+                    await page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
+                    await page.wait_for_timeout(1800)
+                return await page.content()
+            finally:
+                await browser.close()
+
     async def diagnose(self, group_id: Optional[str] = None) -> dict:
         """Fetch de un grupo devolviendo qué respondió FB (para diagnóstico)."""
         gid = group_id or (self.group_ids[0] if self.group_ids else None)
@@ -116,17 +164,14 @@ class FacebookGroupScraper:
         if not gid:
             return {"error": "FB_GROUP_IDS vacío", "config": cfg}
 
-        url = f"{MBASIC}/groups/{gid}"
-        session = await self._get_session()
+        # Render con navegador (m.facebook.com carga el feed por JS)
         try:
-            async with session.get(url, headers=self._headers(), allow_redirects=True) as resp:
-                html = await resp.text()
-                status = resp.status
-                final_url = str(resp.url)
+            html = await self._fetch_browser(gid)
         except Exception as e:  # noqa: BLE001
-            return {"group": gid, "error": f"fetch falló: {e}"}
-        finally:
-            await self.close()
+            return {"group": gid, "error": f"browser falló: {e}", "config": cfg}
+        if not html:
+            return {"group": gid, "error": "sin HTML (browser/sesión)", "config": cfg}
+        status, final_url = 200, f"m.facebook.com/groups/{gid} (rendered)"
 
         low = html[:4000].lower()
         looks_login = ("login" in final_url.lower() or "iniciá sesión" in low
@@ -158,6 +203,10 @@ class FacebookGroupScraper:
             "json_markers": markers,
             "script_count": len(scripts),
             "biggest_scripts": big_scripts,
+            "parsed_posts": [
+                {"kind": classify_post(p["text"]).kind, "text": p["text"][:120]}
+                for p in self._parse_posts(html, gid)[:5]
+            ],
         }
 
     # ─── PARSEO ──────────────────────────────────────────────
@@ -202,7 +251,9 @@ class FacebookGroupScraper:
 
             post_id = self._extract_post_id(art, permalink or "")
             if not post_id:
-                continue  # sin ID estable no podemos deduplicar → saltar
+                # Fallback: hash del contenido (DOM renderizado sin permalink limpio).
+                import hashlib
+                post_id = "h" + hashlib.sha1(text[:200].encode("utf-8")).hexdigest()[:16]
 
             # Autor: primer link de perfil (no de grupo)
             author_name, author_profile = None, None
@@ -210,7 +261,7 @@ class FacebookGroupScraper:
                 href, name = a["href"], a.get_text(strip=True)
                 if name and ("profile.php" in href or re.match(r"^/[A-Za-z0-9.]+/?$", href)) and "/groups/" not in href:
                     author_name = name
-                    author_profile = href if href.startswith("http") else f"{MBASIC}{href}"
+                    author_profile = href if href.startswith("http") else f"https://facebook.com{href}"
                     break
 
             posts.append({
@@ -235,9 +286,8 @@ class FacebookGroupScraper:
             return
 
         for gid in self.group_ids:
-            url = f"{MBASIC}/groups/{gid}"
             logger.info("🔍 Grupo FB", group=gid)
-            html = await self._fetch(url)
+            html = await self._fetch_browser(gid)
             if not html:
                 continue
 
