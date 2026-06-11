@@ -53,6 +53,7 @@ services:
       FB_XS: ${FB_XS:-}
       FB_GROUP_IDS: ${FB_GROUP_IDS:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      FB_DEPLOY_REV: "2"
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,6 +81,7 @@ services:
       FB_XS: ${FB_XS:-}
       FB_GROUP_IDS: ${FB_GROUP_IDS:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      FB_DEPLOY_REV: "2"
     depends_on:
       - api
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q scraping,ai,notifications,default
