@@ -207,6 +207,16 @@ class FacebookGroupScraper:
                 {"kind": classify_post(p["text"]).kind, "text": p["text"][:120]}
                 for p in self._parse_posts(html, gid)[:5]
             ],
+            # Sonda de selectores para ubicar el contenedor de posts en m.facebook
+            "selector_probe": {
+                sel: len(soup.select(sel)) for sel in [
+                    '[role="article"]', '[data-mcomponent]',
+                    '[data-mcomponent="MContainer"]', '[data-tracking-duration-id]',
+                    '[data-type="vscroller"]', '[data-type="vscroller"] > div',
+                    '[aria-posinset]', 'div[data-actorid]', 'article',
+                    'div[data-store]', '[data-gt]',
+                ]
+            },
         }
 
     # ─── PARSEO ──────────────────────────────────────────────
