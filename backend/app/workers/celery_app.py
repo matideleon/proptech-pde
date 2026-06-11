@@ -93,6 +93,13 @@ celery_app.conf.beat_schedule = {
         "args": ("facebook",),
         "options": {"queue": "scraping"},
     },
+    # Grupos de Facebook (alquileres ofrecidos/solicitados) — cada 2 horas.
+    # Solo corre si FB_SESSION_COOKIE + FB_GROUP_IDS están configurados.
+    "scrape-facebook-groups": {
+        "task": "app.workers.tasks.scraping.scrape_facebook_groups",
+        "schedule": crontab(minute=45, hour="*/2"),
+        "options": {"queue": "scraping"},
+    },
     # Análisis IA — cada hora (propiedades sin puntuar)
     "ai-score-new": {
         "task": "app.workers.tasks.ai_tasks.score_new_properties",

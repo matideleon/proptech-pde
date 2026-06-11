@@ -1,13 +1,14 @@
 """Router principal de la API v1."""
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, properties, scraping
+from app.api.v1.endpoints import auth, group_posts, properties, scraping
 
 api_router = APIRouter(prefix="/api/v1")
 
 api_router.include_router(auth.router)
 api_router.include_router(properties.router)
 api_router.include_router(scraping.router)
+api_router.include_router(group_posts.router)
 
 # TODO: Agregar en FASE 2-3
 # api_router.include_router(zones.router)

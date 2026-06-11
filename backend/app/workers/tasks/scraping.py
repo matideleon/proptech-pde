@@ -40,6 +40,25 @@ def scrape_all(parallel: bool = False) -> dict:
     return asyncio.run(runner.run_all(parallel=parallel))
 
 
+@shared_task(
+    name="app.workers.tasks.scraping.scrape_facebook_groups",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=600,
+)
+def scrape_facebook_groups(self) -> dict:
+    """
+    Revisa los grupos privados de Facebook configurados y guarda los posts
+    clasificados como oferta/demanda de alquiler. Requiere FB_SESSION_COOKIE
+    y FB_GROUP_IDS configurados.
+    """
+    logger.info("Iniciando scraping de grupos de Facebook")
+    from app.scrapers.facebook_groups import run_group_scraping
+    result = asyncio.run(run_group_scraping())
+    logger.info("Scraping de grupos FB completado", extra={"result": result})
+    return result
+
+
 @shared_task(name="app.workers.tasks.scraping.detect_removed_properties")
 def detect_removed_properties() -> dict:
     """

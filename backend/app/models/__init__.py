@@ -6,6 +6,7 @@ from app.models.alert import Alert, AlertType
 from app.models.zone import Zone
 from app.models.lead import Lead, LeadStatus
 from app.models.scraping import ScrapingRun, ScrapingSource
+from app.models.group_post import GroupPost, PostKind
 
 __all__ = [
     "TimestampMixin", "UUIDMixin",
@@ -15,4 +16,5 @@ __all__ = [
     "Zone",
     "Lead", "LeadStatus",
     "ScrapingRun", "ScrapingSource",
+    "GroupPost", "PostKind",
 ]

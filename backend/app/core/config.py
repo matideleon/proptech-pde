@@ -81,6 +81,19 @@ class Settings(BaseSettings):
     # de una cuenta (formato JSON de Playwright storage_state).
     FACEBOOK_SESSION_FILE: Optional[str] = None
 
+    # ─── GRUPOS DE FACEBOOK (alquileres ofrecidos/solicitados) ──
+    # Sesión del usuario para leer grupos privados. Formato de header Cookie:
+    #   "c_user=100xxxx; xs=xx%3A...; ..."  (extraída del navegador logueado).
+    FB_SESSION_COOKIE: Optional[str] = None
+    # IDs o slugs de los grupos a monitorear, separados por coma.
+    FB_GROUP_IDS: str = ""
+
+    @property
+    def fb_group_ids_list(self) -> List[str]:
+        if not self.FB_GROUP_IDS:
+            return []
+        return [g.strip() for g in self.FB_GROUP_IDS.split(",") if g.strip()]
+
     @property
     def proxy_list(self) -> List[str]:
         if not self.PROXY_LIST:
