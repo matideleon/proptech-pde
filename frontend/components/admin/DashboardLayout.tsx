@@ -16,6 +16,7 @@ import {
   Activity,
   Bot,
   Database,
+  MessagesSquare,
   Menu,
   X,
 } from "lucide-react";
@@ -46,6 +47,11 @@ const NAV_ITEMS = [
     label: "CRM / Leads",
     href: "/crm",
     icon: Users,
+  },
+  {
+    label: "Grupos FB",
+    href: "/group-posts",
+    icon: MessagesSquare,
   },
   {
     label: "Alertas",

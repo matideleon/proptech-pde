@@ -1,0 +1,233 @@
+"use client";
+
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  MessagesSquare,
+  RefreshCw,
+  MapPin,
+  BedDouble,
+  Phone,
+  ExternalLink,
+  Home,
+  Search,
+} from "lucide-react";
+import { DashboardLayout } from "@/components/admin/DashboardLayout";
+import { groupPostsApi, GroupPost } from "@/lib/api";
+import { cn } from "@/lib/utils";
+
+type Kind = "all" | "oferta" | "demanda";
+
+const PERIOD_LABEL: Record<string, string> = {
+  anual: "Anual",
+  invernal: "Invernal",
+  temporada: "Temporada",
+  diario: "Diario",
+};
+
+export default function GroupPostsPage() {
+  const [kind, setKind] = useState<Kind>("all");
+  const [page, setPage] = useState(1);
+  const qc = useQueryClient();
+
+  const filters = {
+    page,
+    page_size: 24,
+    ...(kind !== "all" ? { kind } : {}),
+  };
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["group-posts", filters],
+    queryFn: () => groupPostsApi.list(filters).then((r) => r.data),
+  });
+
+  const trigger = useMutation({
+    mutationFn: () => groupPostsApi.trigger(),
+    onSuccess: () =>
+      setTimeout(() => qc.invalidateQueries({ queryKey: ["group-posts"] }), 1500),
+  });
+
+  const tabs: { key: Kind; label: string }[] = [
+    { key: "all", label: "Todas" },
+    { key: "oferta", label: "Ofertas" },
+    { key: "demanda", label: "Demandas" },
+  ];
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-4 animate-fade-in">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <MessagesSquare className="h-6 w-6 text-brand-500" />
+              Grupos de Facebook
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Alquileres ofrecidos y solicitados, detectados en tus grupos ·{" "}
+              {isLoading ? "…" : `${data?.total ?? 0} posts`}
+            </p>
+          </div>
+          <button
+            onClick={() => trigger.mutate()}
+            disabled={trigger.isPending}
+            className="flex items-center gap-2 bg-brand-500 text-white rounded-lg px-3 py-2 text-sm hover:bg-brand-600 transition-colors disabled:opacity-60"
+          >
+            <RefreshCw className={cn("h-4 w-4", trigger.isPending && "animate-spin")} />
+            {trigger.isPending ? "Revisando…" : "Revisar grupos ahora"}
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-1 bg-card border rounded-lg p-1 w-fit">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => {
+                setKind(t.key);
+                setPage(1);
+              }}
+              className={cn(
+                "px-4 py-1.5 rounded-md text-sm transition-colors",
+                kind === t.key
+                  ? "bg-brand-500 text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Lista */}
+        {isLoading ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-44 rounded-xl border skeleton" />
+            ))}
+          </div>
+        ) : data?.items?.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <Search className="h-10 w-10 mx-auto mb-3 opacity-40" />
+            <p>No hay posts todavía. Probá “Revisar grupos ahora”.</p>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {data?.items?.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>
+        )}
+
+        {/* Paginación */}
+        {data && data.pages > 1 && (
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40 hover:bg-muted"
+            >
+              Anterior
+            </button>
+            <span className="text-sm text-muted-foreground">
+              Página {page} de {data.pages}
+            </span>
+            <button
+              disabled={page >= data.pages}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40 hover:bg-muted"
+            >
+              Siguiente
+            </button>
+          </div>
+        )}
+        {isFetching && !isLoading && (
+          <p className="text-center text-xs text-muted-foreground">Actualizando…</p>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}
+
+function PostCard({ post }: { post: GroupPost }) {
+  const isOffer = post.kind === "oferta";
+  const date = new Date(post.created_at).toLocaleDateString("es-UY", {
+    day: "2-digit",
+    month: "short",
+  });
+
+  return (
+    <div className="rounded-xl border bg-card p-4 flex flex-col gap-3 shadow-card">
+      <div className="flex items-center justify-between">
+        <span
+          className={cn(
+            "text-xs font-semibold px-2 py-0.5 rounded-full",
+            isOffer
+              ? "bg-emerald-100 text-emerald-700"
+              : "bg-amber-100 text-amber-700"
+          )}
+        >
+          {isOffer ? "🏠 Ofrece" : "🔍 Busca"}
+        </span>
+        <span className="text-xs text-muted-foreground">{date}</span>
+      </div>
+
+      <p className="text-sm leading-snug line-clamp-4">{post.text}</p>
+
+      <div className="flex flex-wrap gap-2 text-xs">
+        {post.neighborhood && (
+          <Chip icon={<MapPin className="h-3 w-3" />}>{post.neighborhood}</Chip>
+        )}
+        {post.price != null && (
+          <Chip>
+            {post.currency === "UYU" ? "$U" : "USD"} {Number(post.price).toLocaleString("es-UY")}
+          </Chip>
+        )}
+        {post.bedrooms != null && (
+          <Chip icon={<BedDouble className="h-3 w-3" />}>{post.bedrooms} dorm</Chip>
+        )}
+        {post.property_type && (
+          <Chip icon={<Home className="h-3 w-3" />}>{post.property_type}</Chip>
+        )}
+        {post.period && <Chip>{PERIOD_LABEL[post.period] ?? post.period}</Chip>}
+      </div>
+
+      <div className="flex items-center justify-between mt-auto pt-1 border-t">
+        <span className="text-xs text-muted-foreground truncate max-w-[55%]">
+          {post.author_name || post.group_name || "Grupo FB"}
+        </span>
+        <div className="flex items-center gap-3">
+          {post.contact_phone && (
+            <a
+              href={`https://wa.me/${post.contact_phone.replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs flex items-center gap-1 text-emerald-600 hover:underline"
+            >
+              <Phone className="h-3 w-3" /> WhatsApp
+            </a>
+          )}
+          {post.permalink && (
+            <a
+              href={post.permalink}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs flex items-center gap-1 text-brand-500 hover:underline"
+            >
+              <ExternalLink className="h-3 w-3" /> Ver
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Chip({ icon, children }: { icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 bg-muted rounded-md px-2 py-0.5">
+      {icon}
+      {children}
+    </span>
+  );
+}

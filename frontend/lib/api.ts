@@ -149,6 +149,34 @@ export const propertiesApi = {
     api.get(`/properties/${id}/price-history`),
 };
 
+export interface GroupPost {
+  id: string;
+  group_id: string;
+  group_name?: string;
+  permalink?: string;
+  author_name?: string;
+  text: string;
+  kind: "oferta" | "demanda" | "otro";
+  operation?: string;
+  property_type?: string;
+  period?: string;
+  neighborhood?: string;
+  price?: number;
+  currency?: string;
+  bedrooms?: number;
+  contact_phone?: string;
+  confidence: number;
+  is_reviewed: boolean;
+  created_at: string;
+}
+
+export const groupPostsApi = {
+  list: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<GroupPost>>("/group-posts", { params }),
+
+  trigger: () => api.post("/group-posts/trigger"),
+};
+
 export const authApi = {
   login: (email: string, password: string) =>
     api.post("/auth/login", { email, password }),
