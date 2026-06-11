@@ -135,6 +135,15 @@ class FacebookGroupScraper:
         soup = BeautifulSoup(html, "lxml")
         articles = (soup.find_all("article") or soup.select('div[role="article"]')
                     or soup.select("div[data-ft]"))
+        # ¿Hay datos de posts embebidos en JSON dentro de la página?
+        markers = {m: html.count(m) for m in
+                   ['"message":', 'story_fbid', '"actors"', '"creation_time"',
+                    'message_render', '"text":', 'feedback', '/groups/']}
+        # Texto visible (lo que un parser DOM extraería)
+        visible = soup.get_text(" ", strip=True)
+        # Muestra de scripts con JSON (donde FB suele embeber el contenido)
+        scripts = soup.find_all("script")
+        big_scripts = sorted((len(s.get_text()) for s in scripts), reverse=True)[:3]
         return {
             "group": gid,
             "http_status": status,
@@ -144,7 +153,11 @@ class FacebookGroupScraper:
             "looks_like_checkpoint": looks_checkpoint,
             "articles_found": len(articles),
             "title": (soup.title.get_text(strip=True)[:120] if soup.title else None),
-            "html_head": html[:300],
+            "visible_text_len": len(visible),
+            "visible_sample": visible[200:700],
+            "json_markers": markers,
+            "script_count": len(scripts),
+            "biggest_scripts": big_scripts,
         }
 
     # ─── PARSEO ──────────────────────────────────────────────
