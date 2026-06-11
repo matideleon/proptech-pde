@@ -239,17 +239,29 @@ class FacebookGroupScraper:
         soup = BeautifulSoup(html, "lxml")
         posts: List[dict] = []
 
-        # En mbasic cada historia es un <article> (o div[role=article] / div[data-ft]).
+        # m.facebook.com renderiza el feed como hijos directos de un "vscroller"
+        # (framework MComponent). Fallback a markup clásico por si cambia.
         articles = (
-            soup.find_all("article")
+            soup.select('[data-type="vscroller"] > div')
+            or soup.find_all("article")
             or soup.select('div[role="article"]')
             or soup.select("div[data-ft]")
         )
 
+        seen_text = set()
         for art in articles:
             text = art.get_text(" ", strip=True)
-            if not text or len(text) < 15:
+            if not text or len(text) < 25:
                 continue
+            # Descartar items de UI que no son posts (composer, encabezado, etc.)
+            if any(ui in text[:60] for ui in ("Escribe algo", "Crear publicación", "ORDENAR")):
+                # quitar el prefijo de UI del feed si quedó pegado
+                pass
+            # Dedup dentro de la misma página
+            key = text[:80]
+            if key in seen_text:
+                continue
+            seen_text.add(key)
 
             # Permalink al post completo
             permalink = None
