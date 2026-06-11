@@ -204,8 +204,14 @@ class FacebookGroupScraper:
             "script_count": len(scripts),
             "biggest_scripts": big_scripts,
             "parsed_posts": [
-                {"kind": classify_post(p["text"]).kind, "text": p["text"][:120]}
+                {"kind": classify_post(p["text"]).kind, "text": p["text"][:120],
+                 "permalink": p.get("permalink")}
                 for p in self._parse_posts(html, gid)[:5]
+            ],
+            # Muestra de hrefs dentro de los primeros contenedores de post
+            "post_hrefs": [
+                [a.get("href") for a in art.find_all("a", href=True)][:8]
+                for art in soup.select('[data-type="vscroller"] > div')[4:7]
             ],
             # Sonda de selectores para ubicar el contenedor de posts en m.facebook
             "selector_probe": {
