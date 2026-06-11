@@ -441,6 +441,10 @@ async def seed_sample_properties():
 async def run_all_seeds():
     """Ejecutar todos los seeds en orden."""
     logger.info("🌱 Iniciando seeds...")
+    # Crear extensiones + tablas antes de sembrar (idempotente: IF NOT EXISTS /
+    # create_all solo crea lo que falta). Necesario en un Postgres recién creado.
+    from app.db.database import init_db
+    await init_db()
     await seed_users()
     await seed_zones()
     await seed_sample_properties()

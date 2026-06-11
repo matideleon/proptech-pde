@@ -52,7 +52,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    command: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 120
+    # Crea extensiones + tablas + seeds (idempotente) una sola vez antes de
+    # levantar gunicorn. Evita la race de los 4 workers creando tablas en paralelo.
+    command: sh -c "python -m app.db.seeds; gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 120"
 
   worker:
     build:
