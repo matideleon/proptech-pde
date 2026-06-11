@@ -333,34 +333,67 @@ class FacebookGroupScraper:
             logger.error("FB_GROUP_IDS vacío — nada para scrapear")
             return
 
-        for gid in self.group_ids:
-            logger.info("🔍 Grupo FB", group=gid)
-            html = await self._fetch_browser(gid)
-            if not html:
-                continue
+        try:
+            from playwright.async_api import async_playwright
+        except Exception as e:  # noqa: BLE001
+            logger.error("Playwright no disponible", error=str(e))
+            return
 
-            raw_posts = self._parse_posts(html, gid)[: self.max_posts_per_group]
-            logger.info("Posts encontrados", group=gid, count=len(raw_posts))
+        # Un solo navegador reutilizado para todos los grupos (eficiente).
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+            )
+            try:
+                ctx = await browser.new_context(
+                    user_agent=_MOBILE_UA, locale="es-UY",
+                    viewport={"width": 412, "height": 900},
+                )
+                await ctx.add_cookies(self._browser_cookies())
+                page = await ctx.new_page()
 
-            for raw in raw_posts:
-                cls: ClassifiedPost = classify_post(raw["text"])
-                if cls.kind == "otro":
-                    continue  # descartar lo no relevante
-                yield {
-                    **raw,
-                    "kind": cls.kind,
-                    "operation": cls.operation,
-                    "property_type": cls.property_type,
-                    "period": cls.period,
-                    "neighborhood": cls.neighborhood,
-                    "price": cls.price,
-                    "currency": cls.currency,
-                    "bedrooms": cls.bedrooms,
-                    "contact_phone": cls.contact_phone,
-                    "confidence": cls.confidence,
-                    "classified_by": "keywords",
-                    "raw_data": {"matched": cls.matched},
-                }
+                for gid in self.group_ids:
+                    logger.info("🔍 Grupo FB", group=gid)
+                    try:
+                        await page.goto(f"https://m.facebook.com/groups/{gid}",
+                                        wait_until="domcontentloaded", timeout=45000)
+                        try:
+                            await page.wait_for_selector('[data-type="vscroller"]', timeout=12000)
+                        except Exception:  # noqa: BLE001
+                            pass
+                        for _ in range(4):
+                            await page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
+                            await page.wait_for_timeout(1800)
+                        html = await page.content()
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning("Grupo falló", group=gid, error=str(e))
+                        continue
+
+                    raw_posts = self._parse_posts(html, gid)[: self.max_posts_per_group]
+                    logger.info("Posts encontrados", group=gid, count=len(raw_posts))
+
+                    for raw in raw_posts:
+                        cls: ClassifiedPost = classify_post(raw["text"])
+                        if cls.kind == "otro":
+                            continue
+                        yield {
+                            **raw,
+                            "kind": cls.kind,
+                            "operation": cls.operation,
+                            "property_type": cls.property_type,
+                            "period": cls.period,
+                            "neighborhood": cls.neighborhood,
+                            "price": cls.price,
+                            "currency": cls.currency,
+                            "bedrooms": cls.bedrooms,
+                            "contact_phone": cls.contact_phone,
+                            "confidence": cls.confidence,
+                            "classified_by": "keywords",
+                            "raw_data": {"matched": cls.matched},
+                        }
+            finally:
+                await browser.close()
 
 
 async def run_group_scraping(
