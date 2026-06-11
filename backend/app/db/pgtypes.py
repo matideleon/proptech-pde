@@ -41,6 +41,13 @@ class UUID(TypeDecorator):
     def process_bind_param(self, value, dialect):
         if value is None:
             return value
+        if dialect.name == "postgresql":
+            # PG_UUID(as_uuid=True) maneja uuid.UUID nativamente y devuelve
+            # objetos UUID en RETURNING. Convertir a str rompe el "sentinel
+            # matching" de insertmanyvalues (INSERT...RETURNING en bulk: seeds,
+            # scraper) → "Can't match sentinel values". Pasamos el UUID nativo.
+            return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+        # SQLite usa CHAR(36): necesita string.
         return str(value)
 
     def process_result_value(self, value, dialect):
