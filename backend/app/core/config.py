@@ -105,6 +105,14 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_ID: Optional[str] = None
     WHATSAPP_TOKEN: Optional[str] = None
     WHATSAPP_VERIFY_TOKEN: Optional[str] = None
+    # Destinatario del digest diario (formato internacional sin +, ej. 59899123456)
+    WHATSAPP_ALERT_TO: Optional[str] = None
+
+    # ─── DIGEST DIARIO ───────────────────────────────────────
+    # URL pública base para construir el link del dashboard en las alertas.
+    PUBLIC_BASE_URL: str = "https://dynamiclabsai.com"
+    # Ventana (horas) para considerar una propiedad "nueva" en el digest.
+    DIGEST_WINDOW_HOURS: int = 24
 
     # ─── TELEGRAM ────────────────────────────────────────────
     TELEGRAM_BOT_TOKEN: Optional[str] = None

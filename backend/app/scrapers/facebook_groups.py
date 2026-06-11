@@ -98,6 +98,45 @@ class FacebookGroupScraper:
         if self._session and not self._session.closed:
             await self._session.close()
 
+    async def diagnose(self, group_id: Optional[str] = None) -> dict:
+        """Fetch de un grupo devolviendo qué respondió FB (para diagnóstico)."""
+        gid = group_id or (self.group_ids[0] if self.group_ids else None)
+        if not self.session_cookie:
+            return {"error": "FB_SESSION_COOKIE vacía"}
+        if not gid:
+            return {"error": "FB_GROUP_IDS vacío"}
+
+        url = f"{MBASIC}/groups/{gid}"
+        session = await self._get_session()
+        try:
+            async with session.get(url, headers=self._headers(), allow_redirects=True) as resp:
+                html = await resp.text()
+                status = resp.status
+                final_url = str(resp.url)
+        except Exception as e:  # noqa: BLE001
+            return {"group": gid, "error": f"fetch falló: {e}"}
+        finally:
+            await self.close()
+
+        low = html[:4000].lower()
+        looks_login = ("login" in final_url.lower() or "iniciá sesión" in low
+                       or "log in" in low or "iniciar sesión" in low)
+        looks_checkpoint = "checkpoint" in final_url.lower() or "/checkpoint" in low
+        soup = BeautifulSoup(html, "lxml")
+        articles = (soup.find_all("article") or soup.select('div[role="article"]')
+                    or soup.select("div[data-ft]"))
+        return {
+            "group": gid,
+            "http_status": status,
+            "final_url": final_url[:120],
+            "html_len": len(html),
+            "looks_like_login": looks_login,
+            "looks_like_checkpoint": looks_checkpoint,
+            "articles_found": len(articles),
+            "title": (soup.title.get_text(strip=True)[:120] if soup.title else None),
+            "html_head": html[:300],
+        }
+
     # ─── PARSEO ──────────────────────────────────────────────
     @staticmethod
     def _extract_post_id(article, permalink: str) -> Optional[str]:

@@ -94,3 +94,15 @@ async def trigger_group_scraping(
 
     background_tasks.add_task(run_group_scraping)
     return TriggerResponse(message="Revisión de grupos de Facebook iniciada")
+
+
+@router.get("/debug")
+async def debug_group_fetch(
+    group_id: Optional[str] = None,
+    _admin: User = Depends(require_admin),
+):
+    """Diagnóstico: muestra qué responde Facebook al traer un grupo (admin)."""
+    from app.scrapers.facebook_groups import FacebookGroupScraper
+
+    scraper = FacebookGroupScraper()
+    return await scraper.diagnose(group_id)
