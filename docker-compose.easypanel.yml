@@ -40,7 +40,6 @@ services:
     environment:
       APP_ENV: production
       DEBUG: "false"
-      DEBUG_TRACEBACK: "1"
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
       DATABASE_SYNC_URL: postgresql://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
       REDIS_URL: redis://redis:6379/0

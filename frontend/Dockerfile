@@ -18,6 +18,11 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# next.config.js rewrites() se evalúan en BUILD time y se hornean en el
+# routes-manifest. BACKEND_INTERNAL_URL debe existir acá (no en runtime) para
+# que el proxy /api/v1/* apunte a http://api:8000 y no al fallback localhost.
+ARG BACKEND_INTERNAL_URL=http://api:8000
+ENV BACKEND_INTERNAL_URL=$BACKEND_INTERNAL_URL
 RUN npm run build
 
 # ─── PRODUCTION ─────────────────────────────────────────────

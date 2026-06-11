@@ -184,28 +184,6 @@ async def not_found_handler(request: Request, exc):
     )
 
 
-# TEMPORARY DIAGNOSTIC — expone el traceback real cuando DEBUG_TRACEBACK=1.
-# Quitar una vez diagnosticado el 500 de producción.
-import os as _os
-import traceback as _traceback
-
-
-@app.exception_handler(Exception)
-async def _debug_unhandled(request: Request, exc):
-    if _os.getenv("DEBUG_TRACEBACK") == "1":
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error_type": type(exc).__name__,
-                "error": str(exc),
-                "traceback": _traceback.format_exc().splitlines()[-25:],
-                "path": request.url.path,
-            },
-        )
-    logger.error("Unhandled", path=request.url.path, error=str(exc))
-    return JSONResponse(status_code=500, content={"detail": "Error interno del servidor"})
-
-
 @app.exception_handler(500)
 async def internal_error_handler(request: Request, exc):
     logger.error("Error interno", path=request.url.path, error=str(exc))
