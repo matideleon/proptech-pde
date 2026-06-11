@@ -47,6 +47,10 @@ services:
       SECRET_KEY: ${SECRET_KEY:-this_is_a_placeholder_of_at_least_32_chars_x}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-this_is_a_jwt_placeholder_of_at_least_32_chars}
       ALLOWED_HOSTS: "*"
+      # Grupos de Facebook (alquileres ofrecidos/solicitados) + IA opcional
+      FB_SESSION_COOKIE: ${FB_SESSION_COOKIE:-}
+      FB_GROUP_IDS: ${FB_GROUP_IDS:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,6 +72,10 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/2
       SECRET_KEY: ${SECRET_KEY:-this_is_a_placeholder_of_at_least_32_chars_x}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-this_is_a_jwt_placeholder_of_at_least_32_chars}
+      # Grupos de Facebook — el worker ejecuta la tarea programada cada 2h
+      FB_SESSION_COOKIE: ${FB_SESSION_COOKIE:-}
+      FB_GROUP_IDS: ${FB_GROUP_IDS:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
       - api
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q scraping,ai,notifications,default
