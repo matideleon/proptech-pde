@@ -2,6 +2,10 @@
 const nextConfig = {
   // Output standalone para imágenes Docker chicas (server.js autocontenido)
   output: "standalone",
+  // No redirigir (308) las barras finales: dejamos que /api/v1/properties/
+  // pase tal cual al backend. Si Next quita la barra, FastAPI la vuelve a
+  // agregar (307) con el host interno api:8000 → loop + URL inalcanzable.
+  skipTrailingSlashRedirect: true,
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**.mlstatic.com" },
