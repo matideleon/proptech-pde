@@ -40,10 +40,18 @@ _MOBILE_UA = (
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 )
 
-# Marcas bidireccionales/invisibles que m.facebook intercala como separadores
-# entre autor / rol / fecha y el contenido real del post.
-_BIDI_CHARS = "‎‏‪‫‬‭‮⁦⁧⁨⁩"
+# Marcas bidi/invisibles que m.facebook intercala como separadores entre
+# autor / rol / fecha y el contenido (incluye ZWSP, word-joiner, ALM, BOM).
+# NO incluye ZWJ (\u200d) porque se usa dentro de secuencias de emoji.
+_BIDI_CHARS = "\u200b\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2066\u2067\u2068\u2069\u061c\ufeff"
 _BIDI_DELIM = re.compile(f"[{_BIDI_CHARS}][\\s{_BIDI_CHARS}]*")
+_ROLE_RE = re.compile(
+    r"^(administrador[a]?|colaborador[a]?|moderador[a]?|asesor[a]?(?:\s+inmobiliari[oa])?)\b[\s:.\-]*",
+    re.I)
+# Etiqueta de ubicación que FB agrega al final del post (no es parte del cuerpo).
+_LOCATION_TAIL_RE = re.compile(
+    r"[\s,.]*\b(?:Maldonado|Punta del Este|San Carlos|Piri[a\u00e1]polis|Uruguay)\b[\s,]*(?:Uruguay)?\s*$",
+    re.I)
 
 
 class FacebookGroupScraper:
@@ -371,12 +379,13 @@ class FacebookGroupScraper:
         """
         Extrae el cuerpo legible del post del feed de m.facebook.
 
-        El feed antepone autor/rol/fecha separados por marcas bidi, y al final
-        agrega "V er mas", precio, ubicacion y el footer ("ENVIAR MENSAJE /
-        Comentas como X"). Tomamos lo que va despues del ultimo separador bidi y
-        cortamos en el primer marcador de fin de cuerpo. Verificado vs prod.
+        El feed antepone autor/rol/fecha separados por marcas invisibles, y al
+        final agrega "V er mas", precio, ubicacion y footer ("ENVIAR MENSAJE /
+        Comentas como X"). Tomamos lo de despues del ultimo separador invisible,
+        cortamos en el primer marcador de fin de cuerpo, y sacamos rol al inicio
+        y la etiqueta de ubicacion al final. Verificado contra strings reales.
         """
-        # 1. Contenido = despues del ultimo separador bidi (descarta autor/rol/fecha)
+        # 1. Contenido = despues del ultimo separador invisible (saca autor/rol/fecha)
         parts = _BIDI_DELIM.split(text)
         content = parts[-1] if len(parts) > 1 else text
 
@@ -389,20 +398,24 @@ class FacebookGroupScraper:
         if positions:
             content = content[:min(positions)]
 
-        # 3. Sacar rol al inicio si quedo (caso "Administrador 1500 $U ...")
-        content = re.sub(
-            r"^(administrador[a]?|colaborador[a]?|moderador[a]?)\b[\s:.\-]*",
-            "", content, flags=re.I)
-
-        # 4. Sacar marcas bidi/zero-width y glifos de la Private Use Area (iconos FB)
+        # 3. Sacar marcas invisibles y glifos PUA (iconos FB); conservar ZWJ de emojis
         content = "".join(
             c for c in content
             if c not in _BIDI_CHARS
-            and c not in "\u200b\ufeff"
             and not ("\ue000" <= c <= "\uf8ff" or "\U000f0000" <= c <= "\U0010ffff")
-        )
+        ).strip()
 
-        # 5. Colapsar espacios y sacar ellipsis colgando al final
+        # 4. Sacar rol al inicio (loopeado por si quedo repetido)
+        for _ in range(2):
+            stripped = _ROLE_RE.sub("", content).strip()
+            if stripped == content:
+                break
+            content = stripped
+
+        # 5. Sacar la etiqueta de ubicacion del final
+        content = _LOCATION_TAIL_RE.sub("", content).strip()
+
+        # 6. Colapsar espacios y sacar ellipsis colgando
         content = re.sub(r"\s+", " ", content).strip()
         content = re.sub(r"[\s.\u2026]+$", "", content).strip()
         return content
