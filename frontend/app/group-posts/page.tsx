@@ -183,7 +183,19 @@ function PostCard({ post }: { post: GroupPost }) {
         <span className="text-xs text-muted-foreground">{date}</span>
       </div>
 
-      <p className="text-sm leading-snug line-clamp-4">{post.text}</p>
+      {post.permalink ? (
+        <a
+          href={post.permalink}
+          target="_blank"
+          rel="noreferrer"
+          title="Ver publicación en Facebook"
+          className="text-sm leading-snug line-clamp-4 hover:text-brand-600 transition-colors"
+        >
+          {post.text}
+        </a>
+      ) : (
+        <p className="text-sm leading-snug line-clamp-4">{post.text}</p>
+      )}
 
       {post.external_links && post.external_links.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -240,9 +252,10 @@ function PostCard({ post }: { post: GroupPost }) {
               href={post.permalink}
               target="_blank"
               rel="noreferrer"
+              title="Ver publicación en Facebook"
               className="text-xs flex items-center gap-1 text-brand-500 hover:underline"
             >
-              <ExternalLink className="h-3 w-3" /> Ver
+              <ExternalLink className="h-3 w-3" /> Ver post
             </a>
           )}
         </div>

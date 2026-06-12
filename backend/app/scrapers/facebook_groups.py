@@ -293,6 +293,25 @@ class FacebookGroupScraper:
                 return m.group(1)
         return None
 
+    @staticmethod
+    def _canonical_permalink(group_id: str, post_id: Optional[str], raw: Optional[str]) -> Optional[str]:
+        """
+        URL canónica al post de Facebook, que abre bien en desktop y móvil.
+
+        - Con un post_id numérico real → /groups/{gid}/posts/{id}/ (formato estándar).
+        - Si no, normaliza el host del permalink crudo (mbasic/m/web → www).
+        - Sin nada utilizable → link al grupo (mejor que nada).
+        """
+        if post_id and post_id.isdigit():
+            return f"https://www.facebook.com/groups/{group_id}/posts/{post_id}/"
+        if raw:
+            return re.sub(
+                r"https?://(?:mbasic|m|web|free)\.facebook\.com",
+                "https://www.facebook.com",
+                raw,
+            )
+        return f"https://www.facebook.com/groups/{group_id}"
+
     # Markers de UI que indican que un item NO es un post real.
     _UI_NOISE = (
         "Escribe algo", "Crear publicación", "ORDENAR", "Grupo público",
@@ -361,6 +380,9 @@ class FacebookGroupScraper:
                 # Fallback: hash del contenido (DOM renderizado sin permalink limpio).
                 import hashlib
                 post_id = "h" + hashlib.sha1(text[:200].encode("utf-8")).hexdigest()[:16]
+
+            # Permalink canónico (www.facebook.com) — abre el post en cualquier device.
+            permalink = self._canonical_permalink(group_id, post_id, permalink)
 
             # Autor: primer link de perfil (no de grupo)
             author_name, author_profile = None, None
