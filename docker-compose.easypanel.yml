@@ -49,9 +49,11 @@ services:
       ALLOWED_HOSTS: "*"
       # Grupos de Facebook (alquileres ofrecidos/solicitados) + IA opcional
       FB_C_USER: "61590883850413"
-      # FB_XS (y FB_SESSION_COOKIE) NO se declaran acá a propósito: EasyPanel los
-      # inyecta desde "Variables de entorno". Si los declaramos en el compose, el
-      # valor del compose pisa al inyectado y la cookie llega vacía.
+      # Cookie de sesión FB. EasyPanel no inyecta las env del panel al contenedor
+      # en este setup, así que va hardcodeada. ⚠️ SE VENCE cada pocos días → cuando
+      # el scraper deje de traer posts, reemplazar este valor por uno fresco
+      # (navegador logueado → DevTools → Application → Cookies → xs) y Implementar.
+      FB_XS: "5%3A17Q7sOWMw5ye7A%3A2%3A1781259423%3A-1%3A-1%3A%3AAcxQQn2rFdpFqXnqAWJ9yiT_s3E7UxRZ1te0Bj7dYw"
       FB_GROUP_IDS: "201845184579303,ventasmaldonado,2212495082337087,1968541760097413,321472601612190,204806649591265,168387704589456,363505744066395,1131084233586094,489698635745084,1997233177270740,286936385044509,499458854880203,1596515271245472,342712721039831,784352329635835,1205977434767195"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       FB_DEPLOY_REV: "2"
@@ -78,9 +80,11 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-this_is_a_jwt_placeholder_of_at_least_32_chars}
       # Grupos de Facebook — el worker ejecuta la tarea programada cada 2h
       FB_C_USER: "61590883850413"
-      # FB_XS (y FB_SESSION_COOKIE) NO se declaran acá a propósito: EasyPanel los
-      # inyecta desde "Variables de entorno". Si los declaramos en el compose, el
-      # valor del compose pisa al inyectado y la cookie llega vacía.
+      # Cookie de sesión FB. EasyPanel no inyecta las env del panel al contenedor
+      # en este setup, así que va hardcodeada. ⚠️ SE VENCE cada pocos días → cuando
+      # el scraper deje de traer posts, reemplazar este valor por uno fresco
+      # (navegador logueado → DevTools → Application → Cookies → xs) y Implementar.
+      FB_XS: "5%3A17Q7sOWMw5ye7A%3A2%3A1781259423%3A-1%3A-1%3A%3AAcxQQn2rFdpFqXnqAWJ9yiT_s3E7UxRZ1te0Bj7dYw"
       FB_GROUP_IDS: "201845184579303,ventasmaldonado,2212495082337087,1968541760097413,321472601612190,204806649591265,168387704589456,363505744066395,1131084233586094,489698635745084,1997233177270740,286936385044509,499458854880203,1596515271245472,342712721039831,784352329635835,1205977434767195"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       FB_DEPLOY_REV: "2"
