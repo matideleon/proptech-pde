@@ -1,17 +1,23 @@
-name: Daily Scrape (Facebook + Gallito)
+name: Remote Scrape (properties + FB groups)
 
 on:
   schedule:
-    # 08:00 y 20:00 UTC (05:00 y 17:00 Uruguay)
+    # 08:00 y 20:00 UTC (05:00 y 17:00 Uruguay) — solo propiedades.
+    # Los grupos se disparan a mano (necesitan cookie de FB vigente).
     - cron: "0 8,20 * * *"
   workflow_dispatch:
     inputs:
       sources:
-        description: "Sources (space-separated, default: facebook gallito)"
+        description: "Property sources (space-separated). Vaciar para solo-grupos."
         required: false
         default: "facebook gallito"
       all_sources:
-        description: "Scrape ALL sources (mercadolibre + infocasas también)"
+        description: "Scrape ALL property sources (mercadolibre + infocasas)"
+        type: boolean
+        required: false
+        default: false
+      scrape_groups:
+        description: "Scrapear grupos de Facebook (requiere FB_C_USER/FB_XS/FB_GROUP_IDS)"
         type: boolean
         required: false
         default: false
@@ -35,25 +41,57 @@ jobs:
         run: |
           cd backend
           pip install -r requirements-verified.txt
+          # Deps de scrapers que no están en verified:
+          #  - cloudscraper: Gallito (bypass Cloudflare)
+          #  - playwright: scraper de grupos de FB
+          pip install cloudscraper==1.2.71 playwright==1.41.2
+
+      - name: Install Chromium (solo si se scrapean grupos)
+        if: ${{ github.event.inputs.scrape_groups == 'true' }}
+        run: python -m playwright install --with-deps chromium
 
       - name: Run scrapers & push to prod
         env:
           PROD_URL: ${{ secrets.PROD_URL }}
-          ADMIN_PASS: ${{ secrets.ADMIN_PASS }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-          # Config para que los scrapers no intenten conectar a DB local
-          DATABASE_URL: "sqlite:///tmp/dummy.db"
+          ADMIN_PASS: ${{ secrets.ADMIN_PASS }}
+          # Sesión de Facebook para el scraper de grupos (privados).
+          FB_C_USER: ${{ secrets.FB_C_USER }}
+          FB_XS: ${{ secrets.FB_XS }}
+          FB_GROUP_IDS: ${{ secrets.FB_GROUP_IDS }}
+          # El scraper de grupos importa app.models → crea el engine async,
+          # así que el driver debe ser async aunque la DB no se use (push vía API).
+          DATABASE_URL: "sqlite+aiosqlite:///tmp/dummy.db"
           SECRET_KEY: "github-actions-runner-placeholder-32chars-ok"
           OPENAI_API_KEY: "unused"
         run: |
-          SOURCES="${{ github.event.inputs.sources || 'facebook gallito' }}"
+          SOURCES="${{ github.event.inputs.sources }}"
           ALL="${{ github.event.inputs.all_sources }}"
+          GROUPS="${{ github.event.inputs.scrape_groups }}"
+
+          # Default para corridas por cron (sin inputs): propiedades facebook+gallito.
+          if [ -z "$SOURCES" ] && [ "$ALL" != "true" ] && [ "$GROUPS" != "true" ]; then
+            SOURCES="facebook gallito"
+          fi
 
           if [ "$ALL" = "true" ]; then
-            python scripts/remote_scrape.py --all
+            CMD="--all"
+          elif [ -n "$SOURCES" ]; then
+            CMD="--sources $SOURCES"
           else
-            python scripts/remote_scrape.py --sources $SOURCES
+            CMD=""
           fi
+
+          if [ "$GROUPS" = "true" ]; then
+            if [ -z "$CMD" ]; then
+              CMD="--only-groups"
+            else
+              CMD="$CMD --groups"
+            fi
+          fi
+
+          echo "Ejecutando: remote_scrape.py $CMD"
+          python scripts/remote_scrape.py $CMD
 
       - name: Notify on failure
         if: failure()

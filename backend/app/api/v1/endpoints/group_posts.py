@@ -141,3 +141,90 @@ async def cleanup_junk_posts(
 
     remaining = await db.scalar(select(func.count()).select_from(GroupPost))
     return CleanupResponse(deleted=deleted, remaining=remaining or 0)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Push-batch: recibe group-posts ya scrapeados desde un runner externo
+# (GitHub Actions), donde sí hay sesión de FB válida e IP no bloqueada.
+# ──────────────────────────────────────────────────────────────────────────────
+
+class RemoteGroupPost(BaseModel):
+    group_id: str
+    fb_post_id: str
+    permalink: Optional[str] = None
+    author_name: Optional[str] = None
+    author_profile: Optional[str] = None
+    external_links: List[str] = []
+    text: str
+    kind: str = "otro"
+    operation: Optional[str] = None
+    property_type: Optional[str] = None
+    period: Optional[str] = None
+    neighborhood: Optional[str] = None
+    price: Optional[float] = None
+    currency: Optional[str] = None
+    bedrooms: Optional[int] = None
+    contact_phone: Optional[str] = None
+    confidence: float = 0.0
+    classified_by: str = "keywords"
+
+
+class PushGroupPostsRequest(BaseModel):
+    posts: List[RemoteGroupPost]
+
+
+class PushGroupPostsResponse(BaseModel):
+    received: int
+    new: int
+    skipped: int
+
+
+@router.post("/push-batch", response_model=PushGroupPostsResponse)
+async def push_group_posts(
+    request: PushGroupPostsRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """
+    Recibe group-posts scrapeados externamente y los persiste (dedup por
+    fb_post_id). Usado por GitHub Actions, que corre el scraper de grupos con
+    sesión de FB válida desde una IP no bloqueada. Admin.
+    """
+    new = skipped = 0
+
+    for rp in request.posts:
+        existing = await db.scalar(
+            select(GroupPost.id).where(GroupPost.fb_post_id == rp.fb_post_id)
+        )
+        if existing:
+            skipped += 1
+            continue
+        try:
+            kind = PostKind(rp.kind)
+        except ValueError:
+            kind = PostKind.OTRO
+        db.add(GroupPost(
+            source="facebook_group",
+            group_id=rp.group_id,
+            fb_post_id=rp.fb_post_id,
+            permalink=rp.permalink,
+            author_name=rp.author_name,
+            author_profile=rp.author_profile,
+            external_links=rp.external_links or [],
+            text=rp.text,
+            kind=kind,
+            operation=rp.operation,
+            property_type=rp.property_type,
+            period=rp.period,
+            neighborhood=rp.neighborhood,
+            price=rp.price,
+            currency=rp.currency,
+            bedrooms=rp.bedrooms,
+            contact_phone=rp.contact_phone,
+            confidence=rp.confidence,
+            classified_by=rp.classified_by,
+        ))
+        new += 1
+
+    await db.commit()
+    return PushGroupPostsResponse(received=len(request.posts), new=new, skipped=skipped)

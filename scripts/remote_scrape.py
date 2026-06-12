@@ -123,46 +123,104 @@ async def run_scrapers(sources: List[str]) -> List[dict]:
     return all_props
 
 
-async def main(sources: List[str], dry_run: bool):
+async def run_group_scraper() -> List[dict]:
+    """
+    Ejecuta el scraper de grupos de Facebook (Playwright + sesión FB) y devuelve
+    los posts clasificados ya serializables. Lee FB_C_USER/FB_XS/FB_GROUP_IDS del
+    entorno (vía settings). Distinto a las propiedades: van a otro endpoint.
+    """
+    from app.scrapers.facebook_groups import FacebookGroupScraper
+
+    print("\n→ Scraping facebook_groups (Playwright + sesión FB)...")
+    scraper = FacebookGroupScraper()
+    if not scraper.session_cookie:
+        print("  [error] Sin cookie de FB (FB_C_USER/FB_XS o FB_SESSION_COOKIE). Saltando grupos.")
+        return []
+    if not scraper.group_ids:
+        print("  [error] FB_GROUP_IDS vacío. Saltando grupos.")
+        return []
+
+    posts: List[dict] = []
+    try:
+        async for post in scraper.scrape():
+            posts.append(json.loads(json.dumps(post, default=_serializable)))
+    except Exception as e:
+        print(f"  [error] facebook_groups failed: {e}")
+    finally:
+        await scraper.close()
+    print(f"  facebook_groups: {len(posts)} posts scraped")
+    return posts
+
+
+async def push_group_posts(
+    session: aiohttp.ClientSession,
+    token: str,
+    posts: list,
+    dry_run: bool = False,
+) -> dict:
+    if dry_run:
+        print(f"  [dry-run] Would push {len(posts)} group posts")
+        return {"received": len(posts), "new": 0, "skipped": 0}
+
+    url = f"{PROD_URL}/api/v1/group-posts/push-batch"
+    headers = {"Authorization": f"Bearer {token}"}
+    async with session.post(url, json={"posts": posts}, headers=headers) as r:
+        if r.status != 200:
+            text = await r.text()
+            raise RuntimeError(f"group push-batch failed ({r.status}): {text[:400]}")
+        return await r.json()
+
+
+async def main(sources: List[str], dry_run: bool, scrape_groups: bool = False):
     if not ADMIN_PASS and not dry_run:
         print("ERROR: ADMIN_PASS env var is required")
         sys.exit(1)
 
     print(f"Remote scraper — target: {PROD_URL}")
-    print(f"Sources: {sources}")
+    print(f"Property sources: {sources or '(none)'}")
+    print(f"Scrape FB groups: {scrape_groups}")
     if dry_run:
         print("Mode: DRY RUN (no data pushed)")
 
-    properties = await run_scrapers(sources)
-    print(f"\nTotal scraped: {len(properties)} properties")
+    # Scrapear propiedades (si hay fuentes) y posts de grupos (si se pidió).
+    properties = await run_scrapers(sources) if sources else []
+    group_posts = await run_group_scraper() if scrape_groups else []
 
-    if not properties:
+    print(f"\nTotal scraped: {len(properties)} properties, {len(group_posts)} group posts")
+    if not properties and not group_posts:
         print("Nothing to push.")
         return
 
-    # Push in batches of 200 to avoid huge payloads
     BATCH_SIZE = 200
-    totals = {"received": 0, "new": 0, "updated": 0, "skipped": 0, "errors": 0}
+    prop_totals = {"received": 0, "new": 0, "updated": 0, "skipped": 0, "errors": 0}
+    group_totals = {"received": 0, "new": 0, "skipped": 0}
 
     async with aiohttp.ClientSession() as session:
         token = "" if dry_run else await get_token(session)
         if not dry_run:
             print("Authenticated with prod API")
 
+        # Propiedades → /scraping/push-batch
         for i in range(0, len(properties), BATCH_SIZE):
             batch = properties[i : i + BATCH_SIZE]
-            print(f"\nPushing batch {i // BATCH_SIZE + 1} ({len(batch)} props)...")
+            print(f"\nPushing property batch {i // BATCH_SIZE + 1} ({len(batch)})...")
             result = await push_properties(session, token, batch, dry_run=dry_run)
-            for k in totals:
-                totals[k] += result.get(k, 0)
+            for k in prop_totals:
+                prop_totals[k] += result.get(k, 0)
+
+        # Group posts → /group-posts/push-batch
+        for i in range(0, len(group_posts), BATCH_SIZE):
+            batch = group_posts[i : i + BATCH_SIZE]
+            print(f"\nPushing group-post batch {i // BATCH_SIZE + 1} ({len(batch)})...")
+            result = await push_group_posts(session, token, batch, dry_run=dry_run)
+            for k in group_totals:
+                group_totals[k] += result.get(k, 0)
 
     print(f"\n{'='*50}")
-    print(f"Push summary:")
-    print(f"  Received : {totals['received']}")
-    print(f"  New      : {totals['new']}")
-    print(f"  Updated  : {totals['updated']}")
-    print(f"  Skipped  : {totals['skipped']} (out of price range)")
-    print(f"  Errors   : {totals['errors']}")
+    if properties:
+        print("Properties → new={new} updated={updated} skipped={skipped} errors={errors}".format(**prop_totals))
+    if group_posts:
+        print("Group posts → new={new} skipped={skipped} (received {received})".format(**group_totals))
 
 
 if __name__ == "__main__":
@@ -176,10 +234,24 @@ if __name__ == "__main__":
         help="Scrape all sources"
     )
     parser.add_argument(
+        "--groups", action="store_true",
+        help="Also scrape Facebook groups (Playwright + FB session) → /group-posts/push-batch"
+    )
+    parser.add_argument(
+        "--only-groups", action="store_true",
+        help="Scrape ONLY Facebook groups (no property sources)"
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="Run scrapers but don't push to prod"
     )
     args = parser.parse_args()
 
-    sources = ALL_SOURCES if args.all else args.sources
-    asyncio.run(main(sources, dry_run=args.dry_run))
+    if args.only_groups:
+        sources = []
+    elif args.all:
+        sources = ALL_SOURCES
+    else:
+        sources = args.sources
+    scrape_groups = args.groups or args.only_groups
+    asyncio.run(main(sources, dry_run=args.dry_run, scrape_groups=scrape_groups))
