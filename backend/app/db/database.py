@@ -76,6 +76,41 @@ async def get_db_context() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+# Columnas agregadas después del deploy inicial. `create_all` solo crea tablas
+# faltantes, NO altera tablas existentes, así que las columnas nuevas en tablas
+# ya creadas (p.ej. en prod) se aplican acá de forma idempotente.
+# Formato: (tabla, columna, tipo_postgres, tipo_sqlite)
+_ADDED_COLUMNS = [
+    ("group_posts", "external_links", "JSONB DEFAULT '[]'::jsonb", "JSON DEFAULT '[]'"),
+]
+
+
+async def _ensure_columns(conn, is_postgres: bool) -> None:
+    """Aplica columnas nuevas a tablas existentes (migración ligera idempotente)."""
+    from sqlalchemy import text
+
+    for table, column, pg_type, sqlite_type in _ADDED_COLUMNS:
+        try:
+            if is_postgres:
+                await conn.execute(text(
+                    f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {pg_type}'
+                ))
+            else:
+                # SQLite: ADD COLUMN IF NOT EXISTS no existe en versiones viejas,
+                # así que chequeamos PRAGMA primero.
+                rows = await conn.exec_driver_sql(f"PRAGMA table_info({table})")
+                existing = {r[1] for r in rows.fetchall()}
+                if column not in existing:
+                    await conn.exec_driver_sql(
+                        f"ALTER TABLE {table} ADD COLUMN {column} {sqlite_type}"
+                    )
+        except Exception as e:  # noqa: BLE001 — tabla puede no existir aún; create_all la hará
+            logger.warning(
+                "No se pudo asegurar columna (ignorable si la tabla es nueva)",
+                table=table, column=column, error=str(e),
+            )
+
+
 async def init_db() -> None:
     """Inicializar base de datos — crear extensiones (Postgres) y tablas."""
     from sqlalchemy import text
@@ -100,6 +135,8 @@ async def init_db() -> None:
                         error=str(e),
                     )
         await conn.run_sync(Base.metadata.create_all)
+        # Migración ligera: columnas agregadas tras el deploy inicial.
+        await _ensure_columns(conn, is_postgres)
 
     logger.info("✅ Base de datos inicializada", engine="postgres" if is_postgres else "sqlite")
 

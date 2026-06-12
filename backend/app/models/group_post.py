@@ -40,6 +40,10 @@ class GroupPost(UUIDMixin, TimestampMixin, Base):
     author_name: Mapped[Optional[str]] = mapped_column(String(300))
     author_profile: Mapped[Optional[str]] = mapped_column(String(600))
 
+    # Links a portales inmobiliarios (Marketplace, InfoCasas, ML, Gallito…)
+    # que el autor pegó dentro del post. Lista de URLs.
+    external_links: Mapped[Optional[list]] = mapped_column(JSONB, default=list)
+
     # ─── CONTENIDO ───────────────────────────────────────────
     text: Mapped[str] = mapped_column(Text)
     posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), index=True)

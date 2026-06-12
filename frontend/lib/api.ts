@@ -155,6 +155,7 @@ export interface GroupPost {
   group_name?: string;
   permalink?: string;
   author_name?: string;
+  external_links?: string[];
   text: string;
   kind: "oferta" | "demanda" | "otro";
   operation?: string;

@@ -226,6 +226,59 @@ class FacebookGroupScraper:
         }
 
     # ─── PARSEO ──────────────────────────────────────────────
+    # Substrings de portales inmobiliarios que pueden aparecer en posts de grupos.
+    # Se chequean como substring, por lo que cualquier subdominio (articulo., www.)
+    # también matchea (p.ej. articulo.mercadolibre.com.uy contiene mercadolibre.com.uy).
+    _PROPERTY_DOMAINS = (
+        "facebook.com/marketplace/item/",
+        "infocasas.com.uy/",
+        "mercadolibre.com.uy/",
+        "gallito.com.uy/",
+        "properati.com",
+        "zonaprop.com.uy/",
+    )
+
+    # Regex genérico para cualquier URL http(s) en texto plano.
+    _URL_IN_TEXT = re.compile(r"https?://[^\s\"'<>)\]]+")
+
+    @staticmethod
+    def _unwrap_fb_redirect(href: str) -> str:
+        """FB envuelve links externos en l.facebook.com/l.php?u=<url-encoded>."""
+        if "l.facebook.com" in href or "/l.php" in href:
+            m = re.search(r"[?&]u=([^&]+)", href)
+            if m:
+                import urllib.parse
+                return urllib.parse.unquote(m.group(1))
+        return href
+
+    def _extract_external_links(self, article, raw_html_text: str) -> List[str]:
+        """
+        Extrae URLs de portales inmobiliarios que aparecen en un post.
+        Busca tanto en atributos href como en texto plano.
+        """
+        seen: set = set()
+        links: List[str] = []
+
+        def _add(url: str) -> None:
+            url = self._unwrap_fb_redirect(url)
+            # Limpiar parámetros de tracking y trailing slashes
+            url = re.sub(r"[?#].*$", "", url).rstrip("/")
+            if (url.startswith("http")
+                    and any(d in url for d in self._PROPERTY_DOMAINS)
+                    and url not in seen):
+                seen.add(url)
+                links.append(url)
+
+        # 1. Atributos href de todos los <a> en el artículo
+        for a in article.find_all("a", href=True):
+            _add(a["href"])
+
+        # 2. URLs en texto plano del post (links pegados sin hipervínculo)
+        for m in self._URL_IN_TEXT.finditer(raw_html_text):
+            _add(m.group(0))
+
+        return links
+
     @staticmethod
     def _extract_post_id(article, permalink: str) -> Optional[str]:
         # data-ft suele traer {"top_level_post_id": "..."} o {"mf_story_key": "..."}
@@ -318,6 +371,9 @@ class FacebookGroupScraper:
                     author_profile = href if href.startswith("http") else f"https://facebook.com{href}"
                     break
 
+            # Links externos (Marketplace, portales) presentes en el post
+            external_links = self._extract_external_links(art, str(art))
+
             posts.append({
                 "fb_post_id": f"{group_id}_{post_id}",
                 "group_id": group_id,
@@ -325,6 +381,7 @@ class FacebookGroupScraper:
                 "author_name": author_name,
                 "author_profile": author_profile,
                 "text": text,
+                "external_links": external_links,
             })
 
         return posts
@@ -448,6 +505,7 @@ async def run_group_scraping(
                     contact_phone=post.get("contact_phone"),
                     confidence=post.get("confidence", 0),
                     classified_by=post.get("classified_by", "keywords"),
+                    external_links=post.get("external_links") or [],
                     raw_data=post.get("raw_data", {}),
                 ))
                 new += 1

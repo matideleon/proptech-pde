@@ -25,6 +25,17 @@ const PERIOD_LABEL: Record<string, string> = {
   diario: "Diario",
 };
 
+/** Nombre legible del portal a partir de la URL del link externo. */
+function portalName(url: string): string {
+  if (url.includes("marketplace/item")) return "Marketplace";
+  if (url.includes("infocasas")) return "InfoCasas";
+  if (url.includes("mercadolibre")) return "MercadoLibre";
+  if (url.includes("gallito")) return "Gallito";
+  if (url.includes("properati")) return "Properati";
+  if (url.includes("zonaprop")) return "ZonaProp";
+  return "Ver aviso";
+}
+
 export default function GroupPostsPage() {
   const [kind, setKind] = useState<Kind>("all");
   const [page, setPage] = useState(1);
@@ -173,6 +184,23 @@ function PostCard({ post }: { post: GroupPost }) {
       </div>
 
       <p className="text-sm leading-snug line-clamp-4">{post.text}</p>
+
+      {post.external_links && post.external_links.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {post.external_links.map((url) => (
+            <a
+              key={url}
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-colors"
+            >
+              <ExternalLink className="h-3 w-3" />
+              {portalName(url)}
+            </a>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 text-xs">
         {post.neighborhood && (

@@ -21,6 +21,7 @@ class GroupPostSchema(BaseModel):
     group_name: Optional[str]
     permalink: Optional[str]
     author_name: Optional[str]
+    external_links: List[str] = []
     text: str
     kind: PostKind
     operation: Optional[str]
