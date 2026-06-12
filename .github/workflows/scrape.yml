@@ -69,9 +69,12 @@ jobs:
           ALL="${{ github.event.inputs.all_sources }}"
           GROUPS="${{ github.event.inputs.scrape_groups }}"
 
-          # Default para corridas por cron (sin inputs): propiedades facebook+gallito.
+          # Default para corridas por cron (sin inputs): TODAS las fuentes de
+          # propiedades. ML + InfoCasas funcionan desde cualquier IP; Facebook y
+          # Gallito solo desde IP limpia (la del runner), por eso GH Actions las
+          # cubre. Los grupos quedan fuera del cron (cookie de FB vive en prod).
           if [ -z "$SOURCES" ] && [ "$ALL" != "true" ] && [ "$GROUPS" != "true" ]; then
-            SOURCES="facebook gallito"
+            SOURCES="mercadolibre infocasas facebook gallito"
           fi
 
           if [ "$ALL" = "true" ]; then
