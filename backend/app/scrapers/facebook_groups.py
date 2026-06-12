@@ -225,6 +225,26 @@ class FacebookGroupScraper:
                     'div[data-store]', '[data-gt]',
                 ]
             },
+            # Cuántas veces aparecen patrones de ID de post en TODO el html
+            "postid_patterns": {
+                pat: len(re.findall(rx, html))
+                for pat, rx in {
+                    "/posts/N": r"/posts/\d+",
+                    "/permalink/N": r"/permalink/\d+",
+                    "story_fbid=N": r"story_fbid=\d+",
+                    "top_level_post_id": r"top_level_post_id",
+                    "groups/G/posts": r"/groups/\d+/posts/\d+",
+                }.items()
+            },
+            # Atributos + snippet HTML de los primeros 2 contenedores de post REALES
+            # (los que _parse_posts toma), para ver dónde está el ID del post.
+            "post_container_sample": [
+                {"attrs": dict(art.attrs), "html_snippet": str(art)[:1200]}
+                for art in [
+                    a for a in soup.select('[data-type="vscroller"] > div')
+                    if a.get_text(strip=True) and len(a.get_text(strip=True)) > 40
+                ][:2]
+            ],
         }
 
     # ─── PARSEO ──────────────────────────────────────────────
