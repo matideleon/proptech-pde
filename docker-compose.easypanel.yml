@@ -49,10 +49,9 @@ services:
       ALLOWED_HOSTS: "*"
       # Grupos de Facebook (alquileres ofrecidos/solicitados) + IA opcional
       FB_C_USER: "61590883850413"
-      # Cookie de sesión FB (secreta) — se setea en EasyPanel (Environment), NO acá.
-      FB_XS: ${FB_XS:-}
-      # Alternativa: cookie completa (datr; sb; c_user; xs) en una sola var.
-      FB_SESSION_COOKIE: ${FB_SESSION_COOKIE:-}
+      # FB_XS (y FB_SESSION_COOKIE) NO se declaran acá a propósito: EasyPanel los
+      # inyecta desde "Variables de entorno". Si los declaramos en el compose, el
+      # valor del compose pisa al inyectado y la cookie llega vacía.
       FB_GROUP_IDS: "201845184579303,ventasmaldonado,2212495082337087,1968541760097413,321472601612190,204806649591265,168387704589456,363505744066395,1131084233586094,489698635745084,1997233177270740,286936385044509,499458854880203,1596515271245472,342712721039831,784352329635835,1205977434767195"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       FB_DEPLOY_REV: "2"
@@ -79,10 +78,9 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-this_is_a_jwt_placeholder_of_at_least_32_chars}
       # Grupos de Facebook — el worker ejecuta la tarea programada cada 2h
       FB_C_USER: "61590883850413"
-      # Cookie de sesión FB (secreta) — se setea en EasyPanel (Environment), NO acá.
-      FB_XS: ${FB_XS:-}
-      # Alternativa: cookie completa (datr; sb; c_user; xs) en una sola var.
-      FB_SESSION_COOKIE: ${FB_SESSION_COOKIE:-}
+      # FB_XS (y FB_SESSION_COOKIE) NO se declaran acá a propósito: EasyPanel los
+      # inyecta desde "Variables de entorno". Si los declaramos en el compose, el
+      # valor del compose pisa al inyectado y la cookie llega vacía.
       FB_GROUP_IDS: "201845184579303,ventasmaldonado,2212495082337087,1968541760097413,321472601612190,204806649591265,168387704589456,363505744066395,1131084233586094,489698635745084,1997233177270740,286936385044509,499458854880203,1596515271245472,342712721039831,784352329635835,1205977434767195"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       FB_DEPLOY_REV: "2"
