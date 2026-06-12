@@ -191,6 +191,7 @@ class FacebookGroupScraper:
         big_scripts = sorted((len(s.get_text()) for s in scripts), reverse=True)[:3]
         return {
             "group": gid,
+            "config": cfg,  # qué cookie está usando (sin exponer el valor)
             "http_status": status,
             "final_url": final_url[:120],
             "html_len": len(html),
