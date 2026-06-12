@@ -116,6 +116,7 @@ class CleanupResponse(BaseModel):
 
 @router.post("/cleanup", response_model=CleanupResponse)
 async def cleanup_junk_posts(
+    all: bool = Query(False, description="Si True, borra TODOS los group-posts (no solo la basura)"),
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -123,19 +124,24 @@ async def cleanup_junk_posts(
     Borra posts basura: los que NO son publicaciones reales sino el encabezado
     público del grupo o el muro de login que FB sirve con sesión vencida
     (texto que arranca con "Información sobre este grupo", gate de login, etc.).
-    Admin. Útil para limpiar prod tras un scrapeo con cookie inválida.
+
+    Con ?all=true borra TODOS los group-posts — útil para rehacer el dataset
+    desde cero tras un cambio en la limpieza/clasificación. Admin.
     """
     from sqlalchemy import delete, or_
 
-    junk_prefixes = [
-        "Información sobre este grupo%",
-        "%Hay más contenido para ver%",
-        "%Iniciar sesión Crear cuenta nueva%",
-        "%Mira más fotos, videos y novedades%",
-    ]
-    conds = [GroupPost.text.like(p) for p in junk_prefixes]
+    if all:
+        result = await db.execute(delete(GroupPost))
+    else:
+        junk_prefixes = [
+            "Información sobre este grupo%",
+            "%Hay más contenido para ver%",
+            "%Iniciar sesión Crear cuenta nueva%",
+            "%Mira más fotos, videos y novedades%",
+        ]
+        conds = [GroupPost.text.like(p) for p in junk_prefixes]
+        result = await db.execute(delete(GroupPost).where(or_(*conds)))
 
-    result = await db.execute(delete(GroupPost).where(or_(*conds)))
     await db.commit()
     deleted = result.rowcount or 0
 

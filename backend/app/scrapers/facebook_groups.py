@@ -40,6 +40,11 @@ _MOBILE_UA = (
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 )
 
+# Marcas bidireccionales/invisibles que m.facebook intercala como separadores
+# entre autor / rol / fecha y el contenido real del post.
+_BIDI_CHARS = "‎‏‪‫‬‭‮⁦⁧⁨⁩"
+_BIDI_DELIM = re.compile(f"[{_BIDI_CHARS}][\\s{_BIDI_CHARS}]*")
+
 
 class FacebookGroupScraper:
     """Lee posts de grupos privados con la sesión del usuario."""
@@ -363,24 +368,44 @@ class FacebookGroupScraper:
 
     @staticmethod
     def _clean_post_text(text: str) -> str:
-        """Limpia el texto de un post: glifos de iconos, footer y timestamps."""
-        # Quitar glifos de la Private Use Area (iconos de la fuente de FB)
-        text = "".join(
-            c for c in text
-            if not ("" <= c <= "" or "\U000f0000" <= c <= "\U0010ffff")
+        """
+        Extrae el cuerpo legible del post del feed de m.facebook.
+
+        El feed antepone autor/rol/fecha separados por marcas bidi, y al final
+        agrega "V er mas", precio, ubicacion y el footer ("ENVIAR MENSAJE /
+        Comentas como X"). Tomamos lo que va despues del ultimo separador bidi y
+        cortamos en el primer marcador de fin de cuerpo. Verificado vs prod.
+        """
+        # 1. Contenido = despues del ultimo separador bidi (descarta autor/rol/fecha)
+        parts = _BIDI_DELIM.split(text)
+        content = parts[-1] if len(parts) > 1 else text
+
+        # 2. Cortar en el primer marcador de truncado/footer
+        cut_markers = ("V er m\u00e1s", "Ver m\u00e1s", " \u2026 ", "\u2026 ", " ... ",
+                       "ENVIAR MENSAJE", "Comentas como", "Comentar como",
+                       "Me gusta Comentar", "Todas las reacciones", "Ver publicaci\u00f3n")
+        positions = [content.find(m) for m in cut_markers]
+        positions = [pos for pos in positions if pos > 10]
+        if positions:
+            content = content[:min(positions)]
+
+        # 3. Sacar rol al inicio si quedo (caso "Administrador 1500 $U ...")
+        content = re.sub(
+            r"^(administrador[a]?|colaborador[a]?|moderador[a]?)\b[\s:.\-]*",
+            "", content, flags=re.I)
+
+        # 4. Sacar marcas bidi/zero-width y glifos de la Private Use Area (iconos FB)
+        content = "".join(
+            c for c in content
+            if c not in _BIDI_CHARS
+            and c not in "\u200b\ufeff"
+            and not ("\ue000" <= c <= "\uf8ff" or "\U000f0000" <= c <= "\U0010ffff")
         )
-        # Cortar el footer de interacción
-        for marker in ("Ver publicación", "Me gusta Comentar", "Comentar Compartir",
-                       "Ver más comentarios", "Todas las reacciones", "Comentar como"):
-            i = text.find(marker)
-            if i > 0:
-                text = text[:i]
-        # Quitar tokens de UI y timestamps sueltos
-        text = re.sub(
-            r"(Seguir|Colaborador (?:en ascenso|destacado)|Hace un momento|"
-            r"Me gusta|Comentar|Compartir|Reacciona|Ver traducción)", " ", text)
-        text = re.sub(r"\b\d+\s*(?:min|h|d|sem|año|años)\b", " ", text)
-        return re.sub(r"\s+", " ", text).strip()
+
+        # 5. Colapsar espacios y sacar ellipsis colgando al final
+        content = re.sub(r"\s+", " ", content).strip()
+        content = re.sub(r"[\s.\u2026]+$", "", content).strip()
+        return content
 
     def _parse_posts(self, html: str, group_id: str) -> List[dict]:
         """Extrae posts del feed renderizado de m.facebook.com (MComponent)."""
