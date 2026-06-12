@@ -59,9 +59,12 @@ jobs:
           FB_C_USER: ${{ secrets.FB_C_USER }}
           FB_XS: ${{ secrets.FB_XS }}
           FB_GROUP_IDS: ${{ secrets.FB_GROUP_IDS }}
-          # El scraper de grupos importa app.models → crea el engine async,
-          # así que el driver debe ser async aunque la DB no se use (push vía API).
+          # config.py exige DATABASE_URL y DATABASE_SYNC_URL (sin default). El
+          # scraper NO se conecta a la DB (pushea por API), pero pydantic valida
+          # estos campos al cargar settings → van valores dummy. El async driver
+          # importa porque app.models crea el engine al importarse.
           DATABASE_URL: "sqlite+aiosqlite:///tmp/dummy.db"
+          DATABASE_SYNC_URL: "sqlite:///tmp/dummy.db"
           SECRET_KEY: "github-actions-runner-placeholder-32chars-ok"
           OPENAI_API_KEY: "unused"
         run: |
