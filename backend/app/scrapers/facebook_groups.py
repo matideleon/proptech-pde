@@ -195,6 +195,7 @@ class FacebookGroupScraper:
             "final_url": final_url[:120],
             "html_len": len(html),
             "looks_like_login": looks_login,
+            "looks_like_logged_out": self._looks_logged_out(html),
             "looks_like_checkpoint": looks_checkpoint,
             "articles_found": len(articles),
             "title": (soup.title.get_text(strip=True)[:120] if soup.title else None),
@@ -317,7 +318,27 @@ class FacebookGroupScraper:
         "Escribe algo", "Crear publicación", "ORDENAR", "Grupo público",
         "Grupo privado", "Invitar", "Actividad reciente", "Videos Comunicados",
         "miembros", "Unirte al grupo", "Sugerencias",
+        # Vista pública/deslogueada de FB (no son posts, son el encabezado del grupo
+        # y el muro de login que aparece cuando la cookie de sesión está vencida).
+        "Información sobre este grupo", "Hay más contenido para ver",
+        "Iniciar sesión", "Inicia sesión", "Crear cuenta nueva",
     )
+
+    # Señales de que FB sirvió la vista DESLOGUEADA (cookie vencida/inválida):
+    # solo se ve la descripción del grupo + un gate de login, sin el feed real.
+    _LOGGED_OUT_MARKERS = (
+        "Hay más contenido para ver",
+        "Mira más fotos, videos y novedades",
+        "Iniciar sesión Crear cuenta nueva",
+        "Inicia sesión o crea una cuenta",
+    )
+
+    def _looks_logged_out(self, html: str) -> bool:
+        """¿FB devolvió la vista pública/deslogueada (sin feed) por cookie inválida?"""
+        # Si no hay ningún marcador de contenido de post Y aparece el gate de login.
+        has_post_data = any(m in html for m in ('story_fbid', '"creation_time"', 'feedback'))
+        has_login_gate = any(m in html for m in self._LOGGED_OUT_MARKERS)
+        return has_login_gate and not has_post_data
 
     @staticmethod
     def _clean_post_text(text: str) -> str:
@@ -453,6 +474,17 @@ class FacebookGroupScraper:
                         html = await page.content()
                     except Exception as e:  # noqa: BLE001
                         logger.warning("Grupo falló", group=gid, error=str(e))
+                        continue
+
+                    # Si FB sirvió la vista deslogueada (cookie vencida), NO hay feed:
+                    # solo la descripción del grupo + gate de login. No guardar basura.
+                    if self._looks_logged_out(html):
+                        logger.error(
+                            "⚠️  Facebook devolvió la vista DESLOGUEADA — FB_SESSION_COOKIE "
+                            "vencida o inválida. Refrescá c_user+xs desde el navegador. "
+                            "Sin sesión válida no se ven las publicaciones del grupo.",
+                            group=gid,
+                        )
                         continue
 
                     raw_posts = self._parse_posts(html, gid)[: self.max_posts_per_group]

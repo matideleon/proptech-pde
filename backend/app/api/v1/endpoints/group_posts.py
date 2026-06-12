@@ -107,3 +107,37 @@ async def debug_group_fetch(
 
     scraper = FacebookGroupScraper()
     return await scraper.diagnose(group_id)
+
+
+class CleanupResponse(BaseModel):
+    deleted: int
+    remaining: int
+
+
+@router.post("/cleanup", response_model=CleanupResponse)
+async def cleanup_junk_posts(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """
+    Borra posts basura: los que NO son publicaciones reales sino el encabezado
+    público del grupo o el muro de login que FB sirve con sesión vencida
+    (texto que arranca con "Información sobre este grupo", gate de login, etc.).
+    Admin. Útil para limpiar prod tras un scrapeo con cookie inválida.
+    """
+    from sqlalchemy import delete, or_
+
+    junk_prefixes = [
+        "Información sobre este grupo%",
+        "%Hay más contenido para ver%",
+        "%Iniciar sesión Crear cuenta nueva%",
+        "%Mira más fotos, videos y novedades%",
+    ]
+    conds = [GroupPost.text.like(p) for p in junk_prefixes]
+
+    result = await db.execute(delete(GroupPost).where(or_(*conds)))
+    await db.commit()
+    deleted = result.rowcount or 0
+
+    remaining = await db.scalar(select(func.count()).select_from(GroupPost))
+    return CleanupResponse(deleted=deleted, remaining=remaining or 0)
