@@ -34,6 +34,7 @@ class GroupPostSchema(BaseModel):
     contact_phone: Optional[str]
     confidence: float
     is_reviewed: bool
+    posted_at: Optional[datetime]
     created_at: datetime
 
     class Config:
@@ -165,6 +166,7 @@ class RemoteGroupPost(BaseModel):
     author_profile: Optional[str] = None
     external_links: List[str] = []
     text: str
+    posted_at: Optional[datetime] = None
     kind: str = "otro"
     operation: Optional[str] = None
     property_type: Optional[str] = None
@@ -221,6 +223,7 @@ async def push_group_posts(
             author_profile=rp.author_profile,
             external_links=rp.external_links or [],
             text=rp.text,
+            posted_at=rp.posted_at,
             kind=kind,
             operation=rp.operation,
             property_type=rp.property_type,

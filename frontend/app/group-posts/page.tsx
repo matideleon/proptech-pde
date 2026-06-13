@@ -131,27 +131,9 @@ export default function GroupPostsPage() {
           </div>
         )}
 
-        {/* Paginación */}
+        {/* Paginación numerada */}
         {data && data.pages > 1 && (
-          <div className="flex items-center justify-center gap-3 pt-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40 hover:bg-muted"
-            >
-              Anterior
-            </button>
-            <span className="text-sm text-muted-foreground">
-              Página {page} de {data.pages}
-            </span>
-            <button
-              disabled={page >= data.pages}
-              onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40 hover:bg-muted"
-            >
-              Siguiente
-            </button>
-          </div>
+          <Pagination current={page} total={data.pages} onChange={setPage} />
         )}
         {isFetching && !isLoading && (
           <p className="text-center text-xs text-muted-foreground">Actualizando…</p>
@@ -163,7 +145,8 @@ export default function GroupPostsPage() {
 
 function PostCard({ post }: { post: GroupPost }) {
   const isOffer = post.kind === "oferta";
-  const hoursAgo = (Date.now() - new Date(post.created_at).getTime()) / 3_600_000;
+  const refDate = post.posted_at ?? post.created_at;
+  const hoursAgo = (Date.now() - new Date(refDate).getTime()) / 3_600_000;
   const timeLabel =
     hoursAgo < 1
       ? "hace menos de 1h"
@@ -283,5 +266,55 @@ function Chip({ icon, children }: { icon?: React.ReactNode; children: React.Reac
       {icon}
       {children}
     </span>
+  );
+}
+
+function Pagination({ current, total, onChange }: { current: number; total: number; onChange: (p: number) => void }) {
+  const pages: (number | "…")[] = [];
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (current > 3) pages.push("…");
+    for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i);
+    if (current < total - 2) pages.push("…");
+    pages.push(total);
+  }
+
+  return (
+    <div className="flex items-center justify-center gap-1 pt-2 flex-wrap">
+      <button
+        disabled={current <= 1}
+        onClick={() => onChange(current - 1)}
+        className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40 hover:bg-muted"
+      >
+        ‹
+      </button>
+      {pages.map((p, i) =>
+        p === "…" ? (
+          <span key={`ellipsis-${i}`} className="px-2 text-muted-foreground select-none">…</span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => onChange(p)}
+            className={cn(
+              "min-w-[2rem] px-2 py-1.5 rounded-lg border text-sm transition-colors",
+              p === current
+                ? "bg-brand-500 text-white border-brand-500"
+                : "hover:bg-muted"
+            )}
+          >
+            {p}
+          </button>
+        )
+      )}
+      <button
+        disabled={current >= total}
+        onClick={() => onChange(current + 1)}
+        className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40 hover:bg-muted"
+      >
+        ›
+      </button>
+    </div>
   );
 }

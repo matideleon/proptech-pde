@@ -168,6 +168,7 @@ export interface GroupPost {
   contact_phone?: string;
   confidence: number;
   is_reviewed: boolean;
+  posted_at?: string;
   created_at: string;
 }
 

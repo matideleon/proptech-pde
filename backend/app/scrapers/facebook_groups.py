@@ -329,6 +329,27 @@ class FacebookGroupScraper:
         return None
 
     @staticmethod
+    def _extract_posted_at(article) -> Optional[datetime]:
+        """Extrae creation_time (Unix ts) del atributo data-ft del artículo."""
+        from datetime import timezone
+        data_ft = article.get("data-ft", "") if hasattr(article, "get") else ""
+        m = re.search(r'"creation_time"\s*:\s*(\d+)', data_ft)
+        if m:
+            return datetime.fromtimestamp(int(m.group(1)), tz=timezone.utc)
+        # Fallback: <abbr> o <time datetime="..."> que algunos feeds incluyen
+        for tag in article.find_all(["abbr", "time"]):
+            dt = tag.get("data-utime") or tag.get("datetime") or tag.get("title")
+            if dt:
+                try:
+                    if dt.isdigit():
+                        return datetime.fromtimestamp(int(dt), tz=timezone.utc)
+                    from dateutil import parser as dtparser
+                    return dtparser.parse(dt).replace(tzinfo=timezone.utc)
+                except Exception:  # noqa: BLE001
+                    pass
+        return None
+
+    @staticmethod
     def _canonical_permalink(group_id: str, post_id: Optional[str], raw: Optional[str]) -> Optional[str]:
         """
         URL canónica al post de Facebook, que abre bien en desktop y móvil.
@@ -476,6 +497,8 @@ class FacebookGroupScraper:
             # Links externos (Marketplace, portales) presentes en el post
             external_links = self._extract_external_links(art, str(art))
 
+            posted_at = self._extract_posted_at(art)
+
             posts.append({
                 "fb_post_id": f"{group_id}_{post_id}",
                 "group_id": group_id,
@@ -484,6 +507,7 @@ class FacebookGroupScraper:
                 "author_profile": author_profile,
                 "text": text,
                 "external_links": external_links,
+                "posted_at": posted_at,
             })
 
         return posts
@@ -620,6 +644,7 @@ async def run_group_scraping(
                     classified_by=post.get("classified_by", "keywords"),
                     external_links=post.get("external_links") or [],
                     raw_data=post.get("raw_data", {}),
+                    posted_at=post.get("posted_at"),
                 ))
                 new += 1
                 by_kind[post["kind"]] = by_kind.get(post["kind"], 0) + 1
