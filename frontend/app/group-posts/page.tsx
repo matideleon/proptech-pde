@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Home,
   Search,
+  Clock,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/admin/DashboardLayout";
 import { groupPostsApi, GroupPost } from "@/lib/api";
@@ -162,10 +163,19 @@ export default function GroupPostsPage() {
 
 function PostCard({ post }: { post: GroupPost }) {
   const isOffer = post.kind === "oferta";
-  const date = new Date(post.created_at).toLocaleDateString("es-UY", {
-    day: "2-digit",
-    month: "short",
-  });
+  const hoursAgo = (Date.now() - new Date(post.created_at).getTime()) / 3_600_000;
+  const timeLabel =
+    hoursAgo < 1
+      ? "hace menos de 1h"
+      : hoursAgo < 24
+      ? `hace ${Math.floor(hoursAgo)}h`
+      : hoursAgo < 48
+      ? "hace 1 día"
+      : `hace ${Math.floor(hoursAgo / 24)} días`;
+  const timeBadgeClass =
+    hoursAgo < 24
+      ? "bg-amber-400 text-amber-900"
+      : "bg-slate-500/80 text-slate-100";
 
   return (
     <div className="rounded-xl border bg-card p-4 flex flex-col gap-3 shadow-card">
@@ -180,7 +190,10 @@ function PostCard({ post }: { post: GroupPost }) {
         >
           {isOffer ? "🏠 Ofrece" : "🔍 Busca"}
         </span>
-        <span className="text-xs text-muted-foreground">{date}</span>
+        <span className={cn("flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full", timeBadgeClass)}>
+          <Clock className="h-2.5 w-2.5" />
+          {timeLabel}
+        </span>
       </div>
 
       {post.permalink ? (
