@@ -45,6 +45,7 @@ class GroupPostList(BaseModel):
     total: int
     page: int
     page_size: int
+    pages: int
 
 
 @router.get("", response_model=GroupPostList)
@@ -70,11 +71,13 @@ async def list_group_posts(
         .limit(page_size)
     )
     items = result.scalars().all()
+    total_count = total or 0
     return GroupPostList(
         items=[GroupPostSchema.model_validate(p) for p in items],
-        total=total or 0,
+        total=total_count,
         page=page,
         page_size=page_size,
+        pages=max(1, -(-total_count // page_size)),
     )
 
 
