@@ -91,8 +91,8 @@ services:
       # Telegram — el worker ejecuta daily_new_digest (7:00 America/Montevideo).
       # EasyPanel no inyecta las env del panel al contenedor en este setup, así
       # que van hardcodeadas (igual que las cookies de FB de arriba).
-      TELEGRAM_BOT_TOKEN: "8991528497:AAGrD4YksjRPGFkdk0sPJEZ_7tKjhkrFLFY"
-      TELEGRAM_CHAT_ID: "1345306639"
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID:: ${TELEGRAM_CHAT_ID:-}
       PUBLIC_BASE_URL: "https://dynamiclabsai.com"
       DIGEST_WINDOW_HOURS: "24"
     depends_on:
