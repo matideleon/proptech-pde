@@ -44,7 +44,7 @@ export default function GroupPostsPage() {
 
   const filters = {
     page,
-    page_size: 24,
+    page_size: 20,
     ...(kind !== "all" ? { kind } : {}),
   };
 
