@@ -60,12 +60,18 @@ export function PropertyCard({
   const hoursAgo = property.first_seen_at
     ? (Date.now() - new Date(property.first_seen_at).getTime()) / 3_600_000
     : null;
-  const isNew = hoursAgo !== null && hoursAgo < 24;
-  const newLabel = isNew
-    ? hoursAgo < 1
-      ? "hace menos de 1h"
-      : `hace ${Math.floor(hoursAgo)}h`
-    : null;
+  const timeLabel = hoursAgo === null
+    ? null
+    : hoursAgo < 1
+    ? "hace menos de 1h"
+    : hoursAgo < 24
+    ? `hace ${Math.floor(hoursAgo)}h`
+    : hoursAgo < 48
+    ? "hace 1 día"
+    : `hace ${Math.floor(hoursAgo / 24)} días`;
+  const timeBadgeClass = hoursAgo !== null && hoursAgo < 24
+    ? "bg-amber-400 text-amber-900"
+    : "bg-slate-500/80 text-slate-100";
 
   const operationLabel =
     property.operation === "venta"
@@ -134,10 +140,10 @@ export function PropertyCard({
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-background/80 backdrop-blur-sm text-foreground">
                 {propertyTypeLabel[property.property_type] || "Propiedad"}
               </span>
-              {newLabel && (
-                <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-400 text-amber-900">
+              {timeLabel && (
+                <span className={cn("flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full", timeBadgeClass)}>
                   <Clock className="h-2.5 w-2.5" />
-                  {newLabel}
+                  {timeLabel}
                 </span>
               )}
             </div>
