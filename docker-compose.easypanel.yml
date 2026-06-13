@@ -92,7 +92,7 @@ services:
       # EasyPanel no inyecta las env del panel al contenedor en este setup, así
       # que van hardcodeadas (igual que las cookies de FB de arriba).
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_CHAT_ID:: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       PUBLIC_BASE_URL: "https://dynamiclabsai.com"
       DIGEST_WINDOW_HOURS: "24"
     depends_on:
