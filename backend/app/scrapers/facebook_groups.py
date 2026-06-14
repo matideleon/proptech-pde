@@ -21,6 +21,7 @@ import asyncio
 import os
 import random
 import re
+import tempfile
 from dataclasses import asdict
 from typing import AsyncGenerator, Dict, List, Optional
 
@@ -131,12 +132,30 @@ class FacebookGroupScraper:
         return cookies
 
     def _profile_dir(self) -> str:
-        return os.path.join(settings.PLAYWRIGHT_DATA_DIR, "fb-profile")
+        """
+        Dir del perfil persistente de Playwright. Si el path configurado
+        (PLAYWRIGHT_DATA_DIR, normalmente un volumen) no es escribible por el
+        usuario del contenedor, cae a un dir temporal escribible para no
+        crashear. La cookie se re-siembra desde FB_XS en cada arranque, así que
+        perder la persistencia solo implica re-login eventual, no pérdida de datos.
+        """
+        base = settings.PLAYWRIGHT_DATA_DIR or tempfile.gettempdir()
+        profile = os.path.join(base, "fb-profile")
+        try:
+            os.makedirs(profile, exist_ok=True)
+            return profile
+        except OSError as e:
+            fallback = os.path.join(tempfile.gettempdir(), "fb-profile")
+            logger.warning(
+                "Perfil persistente no escribible (%s) — usando fallback %s",
+                str(e), fallback,
+            )
+            os.makedirs(fallback, exist_ok=True)
+            return fallback
 
     async def _open_persistent_context(self, p):
         """Abre el contexto Playwright con perfil persistente (sobrevive reinicios)."""
         profile = self._profile_dir()
-        os.makedirs(profile, exist_ok=True)
         ctx = await p.chromium.launch_persistent_context(
             user_data_dir=profile,
             headless=True,
