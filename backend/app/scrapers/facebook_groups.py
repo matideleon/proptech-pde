@@ -18,6 +18,7 @@ Configuración (en .env / EasyPanel env):
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import re
 from dataclasses import asdict
@@ -33,6 +34,9 @@ from app.scrapers.post_classifier import ClassifiedPost, classify_post
 logger = get_logger("scraper.fb_groups")
 
 MBASIC = "https://mbasic.facebook.com"
+
+# Lock global para evitar que dos scrapes simultáneos usen el mismo perfil.
+_PROFILE_LOCK: asyncio.Lock = asyncio.Lock()
 
 # UA de navegador móvil real — mbasic responde mejor que con UA de bot.
 _MOBILE_UA = (
@@ -112,8 +116,8 @@ class FacebookGroupScraper:
             await self._session.close()
 
     # ─── NAVEGADOR (Playwright) ──────────────────────────────
-    # m.facebook.com carga el feed por JS, así que para grupos usamos un
-    # navegador headless que renderiza la página antes de parsear.
+    # m.facebook.com carga el feed por JS — usamos Chromium headless con perfil
+    # PERSISTENTE (volumen Docker) para no perder la sesión entre reinicios.
     def _browser_cookies(self) -> List[dict]:
         cookies = []
         for part in self.session_cookie.split(";"):
@@ -126,8 +130,105 @@ class FacebookGroupScraper:
                     })
         return cookies
 
+    def _profile_dir(self) -> str:
+        return os.path.join(settings.PLAYWRIGHT_DATA_DIR, "fb-profile")
+
+    async def _open_persistent_context(self, p):
+        """Abre el contexto Playwright con perfil persistente (sobrevive reinicios)."""
+        profile = self._profile_dir()
+        os.makedirs(profile, exist_ok=True)
+        ctx = await p.chromium.launch_persistent_context(
+            user_data_dir=profile,
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+            user_agent=_MOBILE_UA,
+            locale="es-UY",
+            viewport={"width": 412, "height": 900},
+        )
+        # Sembrar cookies en un perfil vacío (primera vez / después de reset)
+        if self.session_cookie:
+            existing = await ctx.cookies("https://www.facebook.com")
+            if not any(c["name"] == "xs" for c in existing):
+                await ctx.add_cookies(self._browser_cookies())
+                logger.info("🍪 Cookie de sesión sembrada en perfil persistente")
+        return ctx
+
+    async def _ensure_logged_in(self, page, force: bool = False) -> bool:
+        """Verifica sesión activa. Si venció, intenta auto-login con credenciales."""
+        if not force:
+            await page.goto("https://m.facebook.com/", wait_until="domcontentloaded", timeout=30000)
+            html = await page.content()
+            if not self._looks_logged_out(html):
+                return True
+
+        email = settings.FB_EMAIL
+        password = settings.FB_PASSWORD
+        if not email or not password:
+            logger.error("Sesión FB vencida — configurar FB_EMAIL + FB_PASSWORD para auto-login")
+            await self._send_alert(
+                "⚠️ proptech-pde: cookie de Facebook vencida.\n"
+                "No hay FB_EMAIL/FB_PASSWORD configurados → no puedo re-autenticar.\n"
+                "Renovar cookie manualmente en docker-compose.easypanel.yml."
+            )
+            return False
+
+        return await self._auto_login(page, email, password)
+
+    async def _auto_login(self, page, email: str, password: str) -> bool:
+        """Inicia sesión en Facebook usando credenciales guardadas."""
+        try:
+            logger.info("🔑 Auto-login en Facebook...")
+            await page.goto("https://m.facebook.com/login/", wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(random.randint(1000, 2000))
+            await page.fill('input[name="email"]', email)
+            await page.wait_for_timeout(random.randint(500, 1000))
+            await page.fill('input[name="pass"]', password)
+            await page.wait_for_timeout(random.randint(600, 1200))
+            await page.click('button[name="login"]')
+            await page.wait_for_load_state("domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(2000)
+
+            url = page.url
+            if "checkpoint" in url or "two_step" in url or "login" in url:
+                logger.error("FB requiere verificación manual (2FA/checkpoint)", url=url)
+                await self._send_alert(
+                    "⚠️ proptech-pde: auto-login FB falló — se necesita verificación 2FA/checkpoint.\n"
+                    "Entrá a Facebook con la cuenta Trimare y renová la cookie manualmente:\n"
+                    "DevTools → Application → Cookies → xs"
+                )
+                return False
+
+            html = await page.content()
+            if self._looks_logged_out(html):
+                logger.error("Auto-login FB falló — credenciales incorrectas?")
+                await self._send_alert("⚠️ proptech-pde: auto-login FB falló. Verificar FB_EMAIL / FB_PASSWORD.")
+                return False
+
+            logger.info("✅ Auto-login FB exitoso — sesión renovada automáticamente")
+            await self._send_alert("✅ proptech-pde: sesión FB renovada automáticamente por auto-login.")
+            return True
+        except Exception as e:  # noqa: BLE001
+            logger.error("Error en auto-login FB", error=str(e))
+            return False
+
+    async def _send_alert(self, message: str) -> None:
+        """Envía alerta por Telegram si está configurado."""
+        token = settings.TELEGRAM_BOT_TOKEN
+        chat_id = settings.TELEGRAM_CHAT_ID
+        if not token or not chat_id:
+            return
+        try:
+            async with aiohttp.ClientSession() as sess:
+                await sess.post(
+                    f"https://api.telegram.org/bot{token}/sendMessage",
+                    json={"chat_id": chat_id, "text": message},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                )
+        except Exception:  # noqa: BLE001
+            pass
+
     async def _fetch_browser(self, gid: str, scrolls: int = 4) -> Optional[str]:
-        """Renderiza m.facebook.com/groups/{gid} con Chromium y devuelve el HTML."""
+        """Renderiza m.facebook.com/groups/{gid} con perfil persistente."""
         try:
             from playwright.async_api import async_playwright
         except Exception as e:  # noqa: BLE001
@@ -135,29 +236,22 @@ class FacebookGroupScraper:
             return None
 
         url = f"https://m.facebook.com/groups/{gid}"
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
-            )
-            try:
-                ctx = await browser.new_context(
-                    user_agent=_MOBILE_UA, locale="es-UY",
-                    viewport={"width": 412, "height": 900},
-                )
-                await ctx.add_cookies(self._browser_cookies())
-                page = await ctx.new_page()
-                await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+        async with _PROFILE_LOCK:
+            async with async_playwright() as p:
+                ctx = await self._open_persistent_context(p)
                 try:
-                    await page.wait_for_selector('div[role="article"], article', timeout=15000)
-                except Exception:  # noqa: BLE001
-                    pass
-                for _ in range(scrolls):
-                    await page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
-                    await page.wait_for_timeout(1800)
-                return await page.content()
-            finally:
-                await browser.close()
+                    page = await ctx.new_page()
+                    await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                    try:
+                        await page.wait_for_selector('div[role="article"], article', timeout=15000)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    for _ in range(scrolls):
+                        await page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
+                        await page.wait_for_timeout(1800)
+                    return await page.content()
+                finally:
+                    await ctx.close()
 
     async def diagnose(self, group_id: Optional[str] = None) -> dict:
         """Fetch de un grupo devolviendo qué respondió FB (para diagnóstico)."""
@@ -514,10 +608,12 @@ class FacebookGroupScraper:
 
     # ─── PIPELINE ────────────────────────────────────────────
     async def scrape(self) -> AsyncGenerator[dict, None]:
-        """Recorre los grupos y yield-ea posts clasificados (oferta/demanda)."""
-        if not self.session_cookie:
-            logger.error("FB_SESSION_COOKIE no configurada — scraper de grupos deshabilitado")
-            return
+        """
+        Recorre los grupos y yield-ea posts clasificados (oferta/demanda).
+        Usa perfil Playwright persistente: la sesión sobrevive reinicios del
+        contenedor. Si la sesión vence, intenta auto-login con FB_EMAIL/FB_PASSWORD
+        y notifica por Telegram si falla.
+        """
         if not self.group_ids:
             logger.error("FB_GROUP_IDS vacío — nada para scrapear")
             return
@@ -528,72 +624,76 @@ class FacebookGroupScraper:
             logger.error("Playwright no disponible", error=str(e))
             return
 
-        # Un solo navegador reutilizado para todos los grupos (eficiente).
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
-            )
-            try:
-                ctx = await browser.new_context(
-                    user_agent=_MOBILE_UA, locale="es-UY",
-                    viewport={"width": 412, "height": 900},
-                )
-                await ctx.add_cookies(self._browser_cookies())
-                page = await ctx.new_page()
+        async with _PROFILE_LOCK:
+            async with async_playwright() as p:
+                ctx = await self._open_persistent_context(p)
+                try:
+                    page = await ctx.new_page()
 
-                for gid in self.group_ids:
-                    logger.info("🔍 Grupo FB", group=gid)
-                    try:
-                        await page.goto(f"https://m.facebook.com/groups/{gid}",
-                                        wait_until="domcontentloaded", timeout=45000)
+                    # Verificar sesión al inicio; auto-login si venció.
+                    if not await self._ensure_logged_in(page):
+                        logger.error("No se pudo autenticar con Facebook — abortando scrape")
+                        return
+
+                    for gid in self.group_ids:
+                        logger.info("🔍 Grupo FB", group=gid)
                         try:
-                            await page.wait_for_selector('[data-type="vscroller"]', timeout=12000)
-                        except Exception:  # noqa: BLE001
-                            pass
-                        for _ in range(4):
-                            await page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
-                            await page.wait_for_timeout(1800)
-                        html = await page.content()
-                    except Exception as e:  # noqa: BLE001
-                        logger.warning("Grupo falló", group=gid, error=str(e))
-                        continue
-
-                    # Si FB sirvió la vista deslogueada (cookie vencida), NO hay feed:
-                    # solo la descripción del grupo + gate de login. No guardar basura.
-                    if self._looks_logged_out(html):
-                        logger.error(
-                            "⚠️  Facebook devolvió la vista DESLOGUEADA — FB_SESSION_COOKIE "
-                            "vencida o inválida. Refrescá c_user+xs desde el navegador. "
-                            "Sin sesión válida no se ven las publicaciones del grupo.",
-                            group=gid,
-                        )
-                        continue
-
-                    raw_posts = self._parse_posts(html, gid)[: self.max_posts_per_group]
-                    logger.info("Posts encontrados", group=gid, count=len(raw_posts))
-
-                    for raw in raw_posts:
-                        cls: ClassifiedPost = classify_post(raw["text"])
-                        if cls.kind == "otro":
+                            await page.goto(f"https://m.facebook.com/groups/{gid}",
+                                            wait_until="domcontentloaded", timeout=45000)
+                            try:
+                                await page.wait_for_selector('[data-type="vscroller"]', timeout=12000)
+                            except Exception:  # noqa: BLE001
+                                pass
+                            for _ in range(4):
+                                await page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
+                                await page.wait_for_timeout(1800)
+                            html = await page.content()
+                        except Exception as e:  # noqa: BLE001
+                            logger.warning("Grupo falló", group=gid, error=str(e))
                             continue
-                        yield {
-                            **raw,
-                            "kind": cls.kind,
-                            "operation": cls.operation,
-                            "property_type": cls.property_type,
-                            "period": cls.period,
-                            "neighborhood": cls.neighborhood,
-                            "price": cls.price,
-                            "currency": cls.currency,
-                            "bedrooms": cls.bedrooms,
-                            "contact_phone": cls.contact_phone,
-                            "confidence": cls.confidence,
-                            "classified_by": "keywords",
-                            "raw_data": {"matched": cls.matched},
-                        }
-            finally:
-                await browser.close()
+
+                        if self._looks_logged_out(html):
+                            # Sesión vencida a mitad del scrape → intentar re-login una vez.
+                            logger.warning("Sesión vencida durante scrape — re-login automático", group=gid)
+                            if not await self._ensure_logged_in(page, force=True):
+                                logger.error("Re-login falló — abortando scrape")
+                                return
+                            # Reintentar este grupo
+                            try:
+                                await page.goto(f"https://m.facebook.com/groups/{gid}",
+                                                wait_until="domcontentloaded", timeout=45000)
+                                html = await page.content()
+                            except Exception as e:  # noqa: BLE001
+                                logger.warning("Grupo falló tras re-login", group=gid, error=str(e))
+                                continue
+                            if self._looks_logged_out(html):
+                                logger.error("Grupo omitido tras re-login", group=gid)
+                                continue
+
+                        raw_posts = self._parse_posts(html, gid)[: self.max_posts_per_group]
+                        logger.info("Posts encontrados", group=gid, count=len(raw_posts))
+
+                        for raw in raw_posts:
+                            cls: ClassifiedPost = classify_post(raw["text"])
+                            if cls.kind == "otro":
+                                continue
+                            yield {
+                                **raw,
+                                "kind": cls.kind,
+                                "operation": cls.operation,
+                                "property_type": cls.property_type,
+                                "period": cls.period,
+                                "neighborhood": cls.neighborhood,
+                                "price": cls.price,
+                                "currency": cls.currency,
+                                "bedrooms": cls.bedrooms,
+                                "contact_phone": cls.contact_phone,
+                                "confidence": cls.confidence,
+                                "classified_by": "keywords",
+                                "raw_data": {"matched": cls.matched},
+                            }
+                finally:
+                    await ctx.close()
 
 
 async def run_group_scraping(

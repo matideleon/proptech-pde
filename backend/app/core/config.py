@@ -89,8 +89,13 @@ class Settings(BaseSettings):
     FB_SESSION_COOKIE: Optional[str] = None
     FB_C_USER: Optional[str] = None
     FB_XS: Optional[str] = None
+    # Credenciales de la cuenta FB para auto-login cuando la sesión vence.
+    FB_EMAIL: Optional[str] = None
+    FB_PASSWORD: Optional[str] = None
     # IDs o slugs de los grupos a monitorear, separados por coma.
     FB_GROUP_IDS: str = ""
+    # Directorio donde Playwright guarda el perfil persistente (volumen Docker).
+    PLAYWRIGHT_DATA_DIR: str = "/app/playwright-data"
 
     @property
     def fb_session_cookie(self) -> str:
