@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
-# Fix playwright-data permissions if the volume was mounted as root
-if [ -d /app/playwright-data ] && [ ! -w /app/playwright-data ]; then
-    chown appuser:appuser /app/playwright-data
+# El volumen playwright_data se monta como root; aseguramos que appuser pueda escribir.
+if [ -d /app/playwright-data ]; then
+    chown -R appuser:appuser /app/playwright-data || chmod -R 777 /app/playwright-data || true
 fi
 exec gosu appuser "$@"
