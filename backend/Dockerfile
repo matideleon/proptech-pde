@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgdal-dev \
     curl \
     git \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Playwright system deps
@@ -44,8 +45,9 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install chromium && chmod -R a+rx /ms-playwright
 
 COPY . .
+RUN chmod +x /app/entrypoint.sh
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 CMD ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--timeout", "120"]
 
