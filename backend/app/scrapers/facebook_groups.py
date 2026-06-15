@@ -267,62 +267,70 @@ class FacebookGroupScraper:
         email = settings.FB_EMAIL or ""
         password = settings.FB_PASSWORD or ""
 
+        # Perfil TEMPORAL aislado: evita la contención con worker/scheduler sobre
+        # el volumen compartido (causa de los 500 a los 30s al abrir Chromium).
+        import shutil as _shutil
+
+        tmp_profile = tempfile.mkdtemp(prefix="fb-diag-")
+        report["profile_dir"] = tmp_profile
+
         async def _run() -> None:
-            async with _PROFILE_LOCK:
-                async with async_playwright() as p:
-                    ctx = await self._open_persistent_context(p)
+            async with async_playwright() as p:
+                ctx = await p.chromium.launch_persistent_context(
+                    user_data_dir=tmp_profile,
+                    headless=True,
+                    args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+                    user_agent=_MOBILE_UA,
+                    locale="es-UY",
+                    viewport={"width": 412, "height": 900},
+                )
+                try:
+                    page = await ctx.new_page()
                     try:
-                        page = await ctx.new_page()
-                        try:
-                            await page.goto("https://m.facebook.com/", wait_until="domcontentloaded", timeout=30000)
-                            html = await page.content()
-                            step("home", url=page.url, logged_out=self._looks_logged_out(html))
-                        except Exception as e:  # noqa: BLE001
-                            step("home", error=str(e))
+                        await page.goto("https://m.facebook.com/login/", wait_until="domcontentloaded", timeout=45000)
+                        step("goto_login", url=page.url)
+                    except Exception as e:  # noqa: BLE001
+                        step("goto_login", error=str(e))
 
+                    selectors = {
+                        "email[name=email]": 'input[name="email"]',
+                        "email[type=email]": 'input[type="email"]',
+                        "email[type=text]": 'input[type="text"]',
+                        "pass[name=pass]": 'input[name="pass"]',
+                        "pass[type=password]": 'input[type="password"]',
+                        "btn[name=login]": 'button[name="login"]',
+                        "btn[type=submit]": 'button[type="submit"]',
+                        "cookie_banner": '[data-cookiebanner]',
+                    }
+                    present = {}
+                    for label, sel in selectors.items():
                         try:
-                            await page.goto("https://m.facebook.com/login/", wait_until="domcontentloaded", timeout=30000)
-                            step("goto_login", url=page.url)
+                            present[label] = await page.locator(sel).count()
                         except Exception as e:  # noqa: BLE001
-                            step("goto_login", error=str(e))
+                            present[label] = f"err: {e}"
+                    step("selectors", present=present)
 
-                        selectors = {
-                            "email[name=email]": 'input[name="email"]',
-                            "email[type=email]": 'input[type="email"]',
-                            "email[type=text]": 'input[type="text"]',
-                            "pass[name=pass]": 'input[name="pass"]',
-                            "pass[type=password]": 'input[type="password"]',
-                            "btn[name=login]": 'button[name="login"]',
-                            "btn[type=submit]": 'button[type="submit"]',
-                            "cookie_banner": '[data-cookiebanner]',
-                        }
-                        present = {}
-                        for label, sel in selectors.items():
-                            try:
-                                present[label] = await page.locator(sel).count()
-                            except Exception as e:  # noqa: BLE001
-                                present[label] = f"err: {e}"
-                        step("selectors", present=present)
+                    try:
+                        ok = await self._auto_login(page, email, password)
+                        html2 = await page.content()
+                        step("auto_login", ok=ok, url=page.url, logged_out=self._looks_logged_out(html2))
+                    except Exception as e:  # noqa: BLE001
+                        step("auto_login", error=str(e))
 
-                        try:
-                            ok = await self._auto_login(page, email, password)
-                            html2 = await page.content()
-                            step("auto_login", ok=ok, url=page.url, logged_out=self._looks_logged_out(html2))
-                        except Exception as e:  # noqa: BLE001
-                            step("auto_login", error=str(e))
-
-                        try:
-                            cks = await ctx.cookies("https://www.facebook.com")
-                            step("cookies", names=sorted({c["name"] for c in cks}))
-                        except Exception as e:  # noqa: BLE001
-                            step("cookies", error=str(e))
-                    finally:
-                        await ctx.close()
+                    try:
+                        cks = await ctx.cookies("https://www.facebook.com")
+                        step("cookies", names=sorted({c["name"] for c in cks}))
+                    except Exception as e:  # noqa: BLE001
+                        step("cookies", error=str(e))
+                finally:
+                    await ctx.close()
 
         try:
             await _run()
         except Exception as e:  # noqa: BLE001
             report["fatal_error"] = f"{type(e).__name__}: {e}"
+        finally:
+            _shutil.rmtree(tmp_profile, ignore_errors=True)
         return report
 
     async def _send_alert(self, message: str) -> None:

@@ -62,7 +62,7 @@ services:
       TELEGRAM_BOT_TOKEN: "8991528497:AAGrD4YksjRPGFkdk0sPJEZ_7tKjhkrFLFY"
       TELEGRAM_CHAT_ID: "1345306639"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      FB_DEPLOY_REV: "7"
+      FB_DEPLOY_REV: "8"
     volumes:
       - playwright_data:/app/playwright-data
     depends_on:
@@ -94,7 +94,7 @@ services:
       FB_PASSWORD: "donfengvigo2026"
       PLAYWRIGHT_DATA_DIR: "/app/playwright-data"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      FB_DEPLOY_REV: "7"
+      FB_DEPLOY_REV: "8"
       # Telegram
       TELEGRAM_BOT_TOKEN: "8991528497:AAGrD4YksjRPGFkdk0sPJEZ_7tKjhkrFLFY"
       TELEGRAM_CHAT_ID: "1345306639"
@@ -129,7 +129,7 @@ services:
       FB_PASSWORD: "donfengvigo2026"
       PLAYWRIGHT_DATA_DIR: "/app/playwright-data"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      FB_DEPLOY_REV: "7"
+      FB_DEPLOY_REV: "8"
       TELEGRAM_BOT_TOKEN: "8991528497:AAGrD4YksjRPGFkdk0sPJEZ_7tKjhkrFLFY"
       TELEGRAM_CHAT_ID: "1345306639"
     volumes:
