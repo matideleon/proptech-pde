@@ -104,13 +104,25 @@ async def trigger_group_scraping(
 @router.get("/debug")
 async def debug_group_fetch(
     group_id: Optional[str] = None,
+    login: bool = Query(False, description="Si True, intenta el login paso a paso y reporta dónde falla"),
     _admin: User = Depends(require_admin),
 ):
     """Diagnóstico: muestra qué responde Facebook al traer un grupo (admin)."""
     from app.scrapers.facebook_groups import FacebookGroupScraper
 
     scraper = FacebookGroupScraper()
+    if login:
+        return await scraper.diagnose_login()
     return await scraper.diagnose(group_id)
+
+
+@router.post("/reset-session")
+async def reset_fb_session(_admin: User = Depends(require_admin)):
+    """Borra el perfil Playwright persistente (fuerza re-seed de FB_XS / re-login)."""
+    from app.scrapers.facebook_groups import FacebookGroupScraper
+
+    scraper = FacebookGroupScraper()
+    return await scraper.reset_profile()
 
 
 class CleanupResponse(BaseModel):
