@@ -267,56 +267,62 @@ class FacebookGroupScraper:
         email = settings.FB_EMAIL or ""
         password = settings.FB_PASSWORD or ""
 
-        async with _PROFILE_LOCK:
-            async with async_playwright() as p:
-                ctx = await self._open_persistent_context(p)
-                try:
-                    page = await ctx.new_page()
+        async def _run() -> None:
+            async with _PROFILE_LOCK:
+                async with async_playwright() as p:
+                    ctx = await self._open_persistent_context(p)
                     try:
-                        await page.goto("https://m.facebook.com/", wait_until="domcontentloaded", timeout=30000)
-                        html = await page.content()
-                        step("home", url=page.url, logged_out=self._looks_logged_out(html))
-                    except Exception as e:  # noqa: BLE001
-                        step("home", error=str(e))
-
-                    try:
-                        await page.goto("https://m.facebook.com/login/", wait_until="domcontentloaded", timeout=30000)
-                        step("goto_login", url=page.url)
-                    except Exception as e:  # noqa: BLE001
-                        step("goto_login", error=str(e))
-
-                    selectors = {
-                        "email[name=email]": 'input[name="email"]',
-                        "email[type=email]": 'input[type="email"]',
-                        "email[type=text]": 'input[type="text"]',
-                        "pass[name=pass]": 'input[name="pass"]',
-                        "pass[type=password]": 'input[type="password"]',
-                        "btn[name=login]": 'button[name="login"]',
-                        "btn[type=submit]": 'button[type="submit"]',
-                        "cookie_banner": '[data-cookiebanner]',
-                    }
-                    present = {}
-                    for label, sel in selectors.items():
+                        page = await ctx.new_page()
                         try:
-                            present[label] = await page.locator(sel).count()
+                            await page.goto("https://m.facebook.com/", wait_until="domcontentloaded", timeout=30000)
+                            html = await page.content()
+                            step("home", url=page.url, logged_out=self._looks_logged_out(html))
                         except Exception as e:  # noqa: BLE001
-                            present[label] = f"err: {e}"
-                    step("selectors", present=present)
+                            step("home", error=str(e))
 
-                    try:
-                        ok = await self._auto_login(page, email, password)
-                        html2 = await page.content()
-                        step("auto_login", ok=ok, url=page.url, logged_out=self._looks_logged_out(html2))
-                    except Exception as e:  # noqa: BLE001
-                        step("auto_login", error=str(e))
+                        try:
+                            await page.goto("https://m.facebook.com/login/", wait_until="domcontentloaded", timeout=30000)
+                            step("goto_login", url=page.url)
+                        except Exception as e:  # noqa: BLE001
+                            step("goto_login", error=str(e))
 
-                    try:
-                        cks = await ctx.cookies("https://www.facebook.com")
-                        step("cookies", names=sorted({c["name"] for c in cks}))
-                    except Exception as e:  # noqa: BLE001
-                        step("cookies", error=str(e))
-                finally:
-                    await ctx.close()
+                        selectors = {
+                            "email[name=email]": 'input[name="email"]',
+                            "email[type=email]": 'input[type="email"]',
+                            "email[type=text]": 'input[type="text"]',
+                            "pass[name=pass]": 'input[name="pass"]',
+                            "pass[type=password]": 'input[type="password"]',
+                            "btn[name=login]": 'button[name="login"]',
+                            "btn[type=submit]": 'button[type="submit"]',
+                            "cookie_banner": '[data-cookiebanner]',
+                        }
+                        present = {}
+                        for label, sel in selectors.items():
+                            try:
+                                present[label] = await page.locator(sel).count()
+                            except Exception as e:  # noqa: BLE001
+                                present[label] = f"err: {e}"
+                        step("selectors", present=present)
+
+                        try:
+                            ok = await self._auto_login(page, email, password)
+                            html2 = await page.content()
+                            step("auto_login", ok=ok, url=page.url, logged_out=self._looks_logged_out(html2))
+                        except Exception as e:  # noqa: BLE001
+                            step("auto_login", error=str(e))
+
+                        try:
+                            cks = await ctx.cookies("https://www.facebook.com")
+                            step("cookies", names=sorted({c["name"] for c in cks}))
+                        except Exception as e:  # noqa: BLE001
+                            step("cookies", error=str(e))
+                    finally:
+                        await ctx.close()
+
+        try:
+            await _run()
+        except Exception as e:  # noqa: BLE001
+            report["fatal_error"] = f"{type(e).__name__}: {e}"
         return report
 
     async def _send_alert(self, message: str) -> None:

@@ -62,7 +62,7 @@ services:
       TELEGRAM_BOT_TOKEN: "8991528497:AAGrD4YksjRPGFkdk0sPJEZ_7tKjhkrFLFY"
       TELEGRAM_CHAT_ID: "1345306639"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      FB_DEPLOY_REV: "6"
+      FB_DEPLOY_REV: "7"
     volumes:
       - playwright_data:/app/playwright-data
     depends_on:
@@ -72,7 +72,7 @@ services:
         condition: service_started
     # El lifespan de la app (app/main.py) crea extensiones+tablas y siembra
     # admin+zonas de forma idempotente al arrancar — no hace falta seed en el command.
-    command: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 120
+    command: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 300
 
   worker:
     build:
@@ -94,7 +94,7 @@ services:
       FB_PASSWORD: "donfengvigo2026"
       PLAYWRIGHT_DATA_DIR: "/app/playwright-data"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      FB_DEPLOY_REV: "6"
+      FB_DEPLOY_REV: "7"
       # Telegram
       TELEGRAM_BOT_TOKEN: "8991528497:AAGrD4YksjRPGFkdk0sPJEZ_7tKjhkrFLFY"
       TELEGRAM_CHAT_ID: "1345306639"
@@ -129,7 +129,7 @@ services:
       FB_PASSWORD: "donfengvigo2026"
       PLAYWRIGHT_DATA_DIR: "/app/playwright-data"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      FB_DEPLOY_REV: "6"
+      FB_DEPLOY_REV: "7"
       TELEGRAM_BOT_TOKEN: "8991528497:AAGrD4YksjRPGFkdk0sPJEZ_7tKjhkrFLFY"
       TELEGRAM_CHAT_ID: "1345306639"
     volumes:
