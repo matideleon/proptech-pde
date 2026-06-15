@@ -106,6 +106,41 @@ services:
       - api
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q scraping,ai,notifications,default
 
+  # Scheduler propio (independiente de celery beat). Un único proceso que dispara
+  # los scrapes en-proceso por la misma ruta confiable que /scraping/trigger.
+  # Resuelve que el beat dejó de disparar las tareas programadas en prod.
+  scheduler:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
+      DATABASE_SYNC_URL: postgresql://${POSTGRES_USER:-proptech}:${POSTGRES_PASSWORD:-proptech123}@postgres:5432/${POSTGRES_DB:-proptech_pde}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/2
+      SECRET_KEY: ${SECRET_KEY:-this_is_a_placeholder_of_at_least_32_chars_x}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-this_is_a_jwt_placeholder_of_at_least_32_chars}
+      # Grupos de Facebook — mismo setup que worker (comparten el volumen de perfil)
+      FB_C_USER: "61590883850413"
+      FB_XS: "3%3A9mkLd1ZpcASyWw%3A2%3A1781349252%3A-1%3A-1%3A%3AAcxrGiDiRVI2wyWUwxNY-GsztphSlq-I9Xpl4VtKYw"
+      FB_GROUP_IDS: "201845184579303,ventasmaldonado,2212495082337087,1968541760097413,321472601612190,204806649591265,168387704589456,363505744066395,1131084233586094,489698635745084,1997233177270740,286936385044509,499458854880203,1596515271245472,342712721039831,784352329635835,1205977434767195"
+      FB_EMAIL: "trimare.pde@gmail.com"
+      FB_PASSWORD: "REEMPLAZAR_CON_PASSWORD_REAL"
+      PLAYWRIGHT_DATA_DIR: "/app/playwright-data"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      FB_DEPLOY_REV: "5"
+      TELEGRAM_BOT_TOKEN: "8991528497:AAGrD4YksjRPGFkdk0sPJEZ_7tKjhkrFLFY"
+      TELEGRAM_CHAT_ID: "1345306639"
+    volumes:
+      - playwright_data:/app/playwright-data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: python -m app.scheduler
+
   beat:
     build:
       context: ./backend
