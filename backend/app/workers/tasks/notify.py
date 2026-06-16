@@ -10,16 +10,22 @@ from sqlalchemy import and_, or_, select
 logger = get_task_logger(__name__)
 
 # Precio mínimo (USD) que se le exige SOLO a los alquileres para entrar en el
-# digest (filtra ruido / publicaciones sin precio real). Las VENTAS entran sin
-# filtro de precio.
+# digest (filtra ruido / publicaciones sin precio real).
 MIN_PRICE_USD = 500
+
+# Piso de cordura (USD) para VENTAS: NO es un filtro de negocio, solo descarta
+# precios basura (ej. USD 1,25 de publicaciones mal cargadas en Facebook).
+# Las ventas SIN precio igual entran; ninguna venta real en PDE/Maldonado baja
+# de este umbral.
+MIN_SALE_PRICE_USD = 10_000
 
 
 async def _collect_new(hours: int):
     """Devuelve (count, top_zones, price_min, price_max) de propiedades nuevas.
 
     Reglas de precio:
-      • Venta    → sin filtro (entra cualquier precio, incluso sin precio).
+      • Venta    → sin filtro de negocio; solo se descarta precio-basura por
+                   debajo de MIN_SALE_PRICE_USD. Las ventas sin precio entran.
       • Alquiler → solo si price_usd >= MIN_PRICE_USD.
     """
     from app.db.database import get_db_context
@@ -37,8 +43,17 @@ async def _collect_new(hours: int):
                     Property.created_at >= cutoff,
                     Property.status == "active",
                     or_(
-                        Property.operation == OperationType.VENTA,
-                        Property.price_usd >= MIN_PRICE_USD,
+                        and_(
+                            Property.operation == OperationType.VENTA,
+                            or_(
+                                Property.price_usd.is_(None),
+                                Property.price_usd >= MIN_SALE_PRICE_USD,
+                            ),
+                        ),
+                        and_(
+                            Property.operation != OperationType.VENTA,
+                            Property.price_usd >= MIN_PRICE_USD,
+                        ),
                     ),
                 )
             )
