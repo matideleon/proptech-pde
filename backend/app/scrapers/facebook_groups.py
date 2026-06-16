@@ -70,7 +70,11 @@ class FacebookGroupScraper:
         group_ids: Optional[List[str]] = None,
         max_posts_per_group: int = 40,
     ):
-        self.session_cookie = (session_cookie or settings.fb_session_cookie or "").strip()
+        # Prioridad de la cookie: argumento > archivo en el volumen (refresco sin
+        # redeploy, escrito por /group-posts/set-cookie) > env (FB_XS/FB_SESSION).
+        self.session_cookie = (
+            session_cookie or self._read_cookie_file() or settings.fb_session_cookie or ""
+        ).strip()
         raw_groups = group_ids if group_ids is not None else settings.fb_group_ids_list
         self.group_ids = [g.strip() for g in raw_groups if g.strip()]
         self.max_posts_per_group = max_posts_per_group
@@ -131,6 +135,41 @@ class FacebookGroupScraper:
                     })
         return cookies
 
+    def _cookie_file(self) -> str:
+        """Ruta del archivo de cookie en el volumen (refresco sin redeploy)."""
+        base = settings.PLAYWRIGHT_DATA_DIR or tempfile.gettempdir()
+        return os.path.join(base, "fb_cookie.txt")
+
+    def _read_cookie_file(self) -> str:
+        try:
+            path = self._cookie_file()
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as f:
+                    return f.read().strip()
+        except Exception:  # noqa: BLE001
+            pass
+        return ""
+
+    async def set_cookie(self, xs: str, c_user: Optional[str] = None) -> dict:
+        """Guarda una cookie FB fresca en el volumen y resetea el perfil.
+
+        Permite renovar la sesión sin redeploy: el usuario pega el valor `xs`
+        de su navegador logueado y al próximo scrape la sesión queda activa.
+        """
+        xs = (xs or "").strip()
+        if not xs:
+            return {"ok": False, "error": "xs vacío"}
+        cu = (c_user or settings.FB_C_USER or "").strip()
+        cookie = f"c_user={cu}; xs={xs}" if cu else f"xs={xs}"
+        try:
+            with open(self._cookie_file(), "w", encoding="utf-8") as f:
+                f.write(cookie)
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": f"no se pudo escribir la cookie: {e}"}
+        self.session_cookie = cookie
+        reset = await self.reset_profile()
+        return {"ok": True, "cookie_len": len(cookie), "reset": reset.get("reset")}
+
     def _profile_dir(self) -> str:
         """
         Dir del perfil persistente de Playwright. Si el path configurado
@@ -164,12 +203,12 @@ class FacebookGroupScraper:
             locale="es-UY",
             viewport={"width": 412, "height": 900},
         )
-        # Sembrar cookies en un perfil vacío (primera vez / después de reset)
+        # Aplicar SIEMPRE la cookie actual (add_cookies sobrescribe por nombre).
+        # Así una cookie nueva (de set-cookie o env) toma efecto de inmediato y
+        # no queda "pegada" una vieja vencida en el perfil persistente.
         if self.session_cookie:
-            existing = await ctx.cookies("https://www.facebook.com")
-            if not any(c["name"] == "xs" for c in existing):
-                await ctx.add_cookies(self._browser_cookies())
-                logger.info("🍪 Cookie de sesión sembrada en perfil persistente")
+            await ctx.add_cookies(self._browser_cookies())
+            logger.info("🍪 Cookie de sesión aplicada al perfil")
         return ctx
 
     async def _ensure_logged_in(self, page, force: bool = False) -> bool:
@@ -203,9 +242,25 @@ class FacebookGroupScraper:
             await page.wait_for_timeout(random.randint(500, 1000))
             await page.fill('input[name="pass"]', password)
             await page.wait_for_timeout(random.randint(600, 1200))
-            await page.click('button[name="login"]')
+            # FB ya no usa <button name=login>; el control es un div[role=button]
+            # con texto "Iniciar sesión". Probamos varias variantes.
+            clicked = False
+            for attempt in (
+                lambda: page.get_by_role("button", name=re.compile("Iniciar sesión|Log in", re.I)).click(timeout=8000),
+                lambda: page.click('[role="button"]:has-text("Iniciar sesión")', timeout=8000),
+                lambda: page.click('button[name="login"]', timeout=5000),
+                lambda: page.press('input[name="pass"]', "Enter"),
+            ):
+                try:
+                    await attempt()
+                    clicked = True
+                    break
+                except Exception:  # noqa: BLE001
+                    continue
+            if not clicked:
+                logger.error("Auto-login: no se encontró el botón de login")
             await page.wait_for_load_state("domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(2000)
+            await page.wait_for_timeout(3000)
 
             url = page.url
             if "checkpoint" in url or "two_step" in url or "login" in url:

@@ -125,6 +125,24 @@ async def reset_fb_session(_admin: User = Depends(require_admin)):
     return await scraper.reset_profile()
 
 
+class SetCookieRequest(BaseModel):
+    xs: str
+    c_user: Optional[str] = None
+
+
+@router.post("/set-cookie")
+async def set_fb_cookie(payload: SetCookieRequest, _admin: User = Depends(require_admin)):
+    """Renueva la cookie de Facebook SIN redeploy.
+
+    El usuario pega el valor `xs` de su navegador logueado a FB y la sesión
+    queda activa en el próximo scrape. No requiere editar el compose ni Implementar.
+    """
+    from app.scrapers.facebook_groups import FacebookGroupScraper
+
+    scraper = FacebookGroupScraper()
+    return await scraper.set_cookie(payload.xs, payload.c_user)
+
+
 class CleanupResponse(BaseModel):
     deleted: int
     remaining: int
