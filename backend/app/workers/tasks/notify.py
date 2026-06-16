@@ -5,19 +5,25 @@ from datetime import datetime, timedelta, timezone
 
 from celery import shared_task
 from celery.utils.log import get_task_logger
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 
 logger = get_task_logger(__name__)
 
-# Precio mínimo (USD) para que una propiedad entre en el digest. Filtra ruido /
-# alquileres / publicaciones sin precio real por debajo de este umbral.
+# Precio mínimo (USD) que se le exige SOLO a los alquileres para entrar en el
+# digest (filtra ruido / publicaciones sin precio real). Las VENTAS entran sin
+# filtro de precio.
 MIN_PRICE_USD = 500
 
 
 async def _collect_new(hours: int):
-    """Devuelve (count, top_zones, price_min, price_max) de propiedades nuevas."""
+    """Devuelve (count, top_zones, price_min, price_max) de propiedades nuevas.
+
+    Reglas de precio:
+      • Venta    → sin filtro (entra cualquier precio, incluso sin precio).
+      • Alquiler → solo si price_usd >= MIN_PRICE_USD.
+    """
     from app.db.database import get_db_context
-    from app.models.property import Property
+    from app.models.property import OperationType, Property
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     async with get_db_context() as db:
@@ -30,7 +36,10 @@ async def _collect_new(hours: int):
                 and_(
                     Property.created_at >= cutoff,
                     Property.status == "active",
-                    Property.price_usd >= MIN_PRICE_USD,
+                    or_(
+                        Property.operation == OperationType.VENTA,
+                        Property.price_usd >= MIN_PRICE_USD,
+                    ),
                 )
             )
         )
