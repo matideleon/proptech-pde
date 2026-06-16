@@ -29,6 +29,7 @@ PROPERTY_SOURCES = ["mercadolibre", "infocasas", "gallito", "facebook"]
 PROPERTY_INTERVAL = 4 * 3600   # propiedades: cada 4 h
 GROUP_INTERVAL = 2 * 3600      # grupos FB: cada 2 h
 AI_SCORE_INTERVAL = 1 * 3600   # scoring IA de propiedades nuevas: cada 1 h
+DIGEST_HOUR_UTC = 10           # digest diario Telegram: 10:00 UTC = 07:00 America/Montevideo
 
 
 async def _scrape_properties() -> None:
@@ -66,6 +67,33 @@ async def _score_new() -> None:
         logger.exception("✗ scoring IA falló")
 
 
+async def _daily_digest() -> None:
+    # daily_new_digest es una tarea Celery síncrona (usa asyncio.run internamente);
+    # la corremos en un thread aparte. Envía a Telegram el resumen de propiedades
+    # nuevas de las últimas 24h con link al dashboard.
+    from app.workers.tasks.notify import daily_new_digest
+
+    logger.info("▶ digest diario Telegram")
+    try:
+        res = await asyncio.to_thread(daily_new_digest)
+        logger.info("✔ digest diario ok: %s", res)
+    except Exception:
+        logger.exception("✗ digest diario falló")
+
+
+async def _daily_at(hour_utc: int, job, *, minute: int = 0) -> None:
+    """Ejecuta `job` una vez por día a la hora UTC indicada."""
+    from datetime import timedelta
+
+    while True:
+        now = datetime.now(timezone.utc)
+        nxt = now.replace(hour=hour_utc, minute=minute, second=0, microsecond=0)
+        if nxt <= now:
+            nxt += timedelta(days=1)
+        await asyncio.sleep((nxt - now).total_seconds())
+        await job()
+
+
 async def _every(interval: int, job, *, initial_delay: float = 0.0) -> None:
     """Ejecuta `job` una vez tras `initial_delay` y luego cada `interval` seg.
 
@@ -93,6 +121,7 @@ async def main() -> None:
         _every(PROPERTY_INTERVAL, _scrape_properties, initial_delay=30),
         _every(GROUP_INTERVAL, _scrape_groups, initial_delay=120),
         _every(AI_SCORE_INTERVAL, _score_new, initial_delay=600),
+        _daily_at(DIGEST_HOUR_UTC, _daily_digest),
     )
 
 
