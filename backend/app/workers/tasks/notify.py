@@ -9,6 +9,10 @@ from sqlalchemy import and_, select
 
 logger = get_task_logger(__name__)
 
+# Precio mínimo (USD) para que una propiedad entre en el digest. Filtra ruido /
+# alquileres / publicaciones sin precio real por debajo de este umbral.
+MIN_PRICE_USD = 500
+
 
 async def _collect_new(hours: int):
     """Devuelve (count, top_zones, price_min, price_max) de propiedades nuevas."""
@@ -26,6 +30,7 @@ async def _collect_new(hours: int):
                 and_(
                     Property.created_at >= cutoff,
                     Property.status == "active",
+                    Property.price_usd >= MIN_PRICE_USD,
                 )
             )
         )
