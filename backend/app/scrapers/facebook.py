@@ -36,7 +36,11 @@ class FacebookMarketplaceScraper(BaseScraper):
         {"lat": -34.85, "lng": -54.66, "radius": 20, "label": "José Ignacio / La Barra"},
     ]
 
-    CATEGORY = "propertyrentals"  # alquileres
+    # Categorías de FB Marketplace: alquiler + venta.
+    CATEGORIES = [
+        {"slug": "propertyrentals", "operation": "alquiler"},
+        {"slug": "propertyforsale", "operation": "venta"},
+    ]
 
     def _get_headers(self) -> dict:
         """Headers de Googlebot para que FB sirva los listings embebidos."""
@@ -86,7 +90,7 @@ class FacebookMarketplaceScraper(BaseScraper):
         )
         return any(t in city for t in targets)
 
-    def _parse_listing(self, item: dict) -> Optional[ScrapedProperty]:
+    def _parse_listing(self, item: dict, operation: str = "alquiler") -> Optional[ScrapedProperty]:
         """Mapear un listing de FB a ScrapedProperty."""
         try:
             ext_id = str(item.get("id"))
@@ -128,7 +132,7 @@ class FacebookMarketplaceScraper(BaseScraper):
                 external_id=ext_id,
                 url=url,
                 property_type=ptype,
-                operation="alquiler",
+                operation=operation,
                 title=title or "Publicación Facebook Marketplace",
                 price=price,
                 currency=currency,
@@ -149,33 +153,37 @@ class FacebookMarketplaceScraper(BaseScraper):
         """Scraping de Facebook Marketplace por zona."""
         global_seen = set()
 
-        for config in self.SEARCH_CONFIGS:
-            label = config["label"]
-            url = (
-                f"{self.BASE_URL}/marketplace/category/{self.CATEGORY}"
-                f"?latitude={config['lat']}&longitude={config['lng']}&radius={config['radius']}"
-            )
-            self.logger.info(f"🔍 FB Marketplace: {label}")
+        for category in self.CATEGORIES:
+            slug = category["slug"]
+            operation = category["operation"]
 
-            html = await self._fetch(url)
-            if not html:
-                self.logger.warning("FB no devolvió HTML", zona=label)
-                continue
+            for config in self.SEARCH_CONFIGS:
+                label = config["label"]
+                url = (
+                    f"{self.BASE_URL}/marketplace/category/{slug}"
+                    f"?latitude={config['lat']}&longitude={config['lng']}&radius={config['radius']}"
+                )
+                self.logger.info(f"🔍 FB Marketplace [{operation}]: {label}")
 
-            listings = self._extract_listings(html)
-            self.stats.pages_scraped += 1
-            count = 0
-
-            for item in listings:
-                if not self._is_target_location(item):
+                html = await self._fetch(url)
+                if not html:
+                    self.logger.warning("FB no devolvió HTML", zona=label, operation=operation)
                     continue
-                prop = self._parse_listing(item)
-                if not prop or not prop.external_id:
-                    continue
-                if prop.external_id in global_seen:
-                    continue
-                global_seen.add(prop.external_id)
-                count += 1
-                yield prop
 
-            self.logger.info(f"✅ FB {label}: {count} listings de la zona")
+                listings = self._extract_listings(html)
+                self.stats.pages_scraped += 1
+                count = 0
+
+                for item in listings:
+                    if not self._is_target_location(item):
+                        continue
+                    prop = self._parse_listing(item, operation)
+                    if not prop or not prop.external_id:
+                        continue
+                    if prop.external_id in global_seen:
+                        continue
+                    global_seen.add(prop.external_id)
+                    count += 1
+                    yield prop
+
+                self.logger.info(f"✅ FB [{operation}] {label}: {count} listings de la zona")

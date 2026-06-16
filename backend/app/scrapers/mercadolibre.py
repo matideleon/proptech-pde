@@ -380,10 +380,12 @@ class MercadoLibreWebScraper(BaseScraper):
     # UA de Googlebot: ML sirve el contenido para indexación.
     GOOGLEBOT_UA = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
 
-    # Solo alquiler, zonas de Maldonado / Punta del Este.
+    # Alquiler + venta, zonas de Maldonado / Punta del Este.
     SEARCH_URLS = [
         ("https://listado.mercadolibre.com.uy/inmuebles/alquiler/maldonado/", "alquiler"),
         ("https://listado.mercadolibre.com.uy/inmuebles/departamentos/alquiler/punta-del-este/", "alquiler"),
+        ("https://listado.mercadolibre.com.uy/inmuebles/venta/maldonado/", "venta"),
+        ("https://listado.mercadolibre.com.uy/inmuebles/departamentos/venta/punta-del-este/", "venta"),
     ]
 
     ITEMS_PER_PAGE = 48

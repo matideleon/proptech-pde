@@ -30,9 +30,8 @@ class InfoCasasScraper(BaseScraper):
     SOURCE_NAME = "infocasas"
     BASE_URL = "https://www.infocasas.com.uy"
 
-    # Configuraciones de búsqueda — foco en ALQUILER (datos vía __NEXT_DATA__).
+    # Configuraciones de búsqueda — alquiler + venta (datos vía __NEXT_DATA__).
     # Estos paths devuelven HTML con el JSON embebido de Next.js.
-    # Foco exclusivo en ALQUILER (sin ventas).
     SEARCH_CONFIGS = [
         {
             "path": "/alquiler/casas-y-apartamentos/maldonado",
@@ -48,6 +47,21 @@ class InfoCasasScraper(BaseScraper):
             "path": "/alquiler/casas-y-apartamentos/maldonado/maldonado",
             "operation": "alquiler",
             "label": "Alquiler Maldonado ciudad",
+        },
+        {
+            "path": "/venta/casas-y-apartamentos/maldonado",
+            "operation": "venta",
+            "label": "Venta Maldonado",
+        },
+        {
+            "path": "/venta/casas-y-apartamentos/punta-del-este",
+            "operation": "venta",
+            "label": "Venta Punta del Este",
+        },
+        {
+            "path": "/venta/casas-y-apartamentos/maldonado/maldonado",
+            "operation": "venta",
+            "label": "Venta Maldonado ciudad",
         },
     ]
 

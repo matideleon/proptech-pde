@@ -33,9 +33,10 @@ class GallitoScraper(BaseScraper):
     SOURCE_NAME = "gallito"
     BASE_URL = "https://www.gallito.com.uy"
 
-    # Rutas de alquiler. Gallito pagina con ?pag=N
+    # Rutas de alquiler + venta. Gallito pagina con ?pag=N
     SEARCH_CONFIGS = [
-        {"path": "/inmuebles/alquileres/maldonado", "label": "Alquiler Maldonado"},
+        {"path": "/inmuebles/alquileres/maldonado", "operation": "alquiler", "label": "Alquiler Maldonado"},
+        {"path": "/inmuebles/venta/maldonado", "operation": "venta", "label": "Venta Maldonado"},
     ]
     MAX_PAGES = 6
 
@@ -103,7 +104,7 @@ class GallitoScraper(BaseScraper):
         return await loop.run_in_executor(None, _do)
 
     # ─────────────────────────────────────────────────────────
-    def _parse_article(self, art) -> Optional[ScrapedProperty]:
+    def _parse_article(self, art, operation: str = "alquiler") -> Optional[ScrapedProperty]:
         """Parsear un <article> del listado de Gallito."""
         try:
             html_str = str(art)
@@ -174,7 +175,7 @@ class GallitoScraper(BaseScraper):
                 external_id=ext_id,
                 url=url,
                 property_type=ptype,
-                operation="alquiler",
+                operation=operation,
                 title=title or "Aviso Gallito",
                 price=price,
                 currency=currency,
@@ -197,6 +198,7 @@ class GallitoScraper(BaseScraper):
 
         for config in self.SEARCH_CONFIGS:
             label = config["label"]
+            operation = config.get("operation", "alquiler")
             self.logger.info(f"🔍 Gallito: {label}")
             seen = set()
 
@@ -219,7 +221,7 @@ class GallitoScraper(BaseScraper):
                 new_in_page = 0
 
                 for art in articles:
-                    prop = self._parse_article(art)
+                    prop = self._parse_article(art, operation)
                     if not prop or not prop.external_id:
                         continue
                     if prop.external_id in seen:
