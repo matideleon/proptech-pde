@@ -17,16 +17,16 @@ from typing import List
 USD_UYU_RATE = 40.0
 
 # ─── RANGO OBJETIVO DE ALQUILER ──────────────────────────────
-# Rango estricto solicitado: USD 400 – 2.000 (sin tolerancia).
-RENT_MIN_USD = 400
+# Rango estricto solicitado: USD 500 – 2.000 (sin tolerancia).
+RENT_MIN_USD = 500
 RENT_MAX_USD = 2_000
-RENT_MIN_UYU = RENT_MIN_USD * int(USD_UYU_RATE)      # 16000
+RENT_MIN_UYU = RENT_MIN_USD * int(USD_UYU_RATE)      # 20000
 RENT_MAX_UYU = RENT_MAX_USD * int(USD_UYU_RATE)      # 80000
 
 # Límites efectivos del filtro (estrictos, sin holgura)
-RENT_MIN_USD_SOFT = RENT_MIN_USD                      # 400
+RENT_MIN_USD_SOFT = RENT_MIN_USD                      # 500
 RENT_MAX_USD_SOFT = RENT_MAX_USD                      # 2000
-RENT_MIN_UYU_SOFT = RENT_MIN_UYU                      # 16000
+RENT_MIN_UYU_SOFT = RENT_MIN_UYU                      # 20000
 RENT_MAX_UYU_SOFT = RENT_MAX_UYU                      # 80000
 
 
