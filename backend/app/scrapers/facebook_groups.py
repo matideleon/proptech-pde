@@ -643,11 +643,18 @@ class FacebookGroupScraper:
     _UI_NOISE = (
         "Escribe algo", "Crear publicación", "ORDENAR", "Grupo público",
         "Grupo privado", "Invitar", "Actividad reciente", "Videos Comunicados",
-        "miembros", "Unirte al grupo", "Sugerencias",
+        "miembros", "Unirte al grupo", "Unirse al grupo", "Sugerencias",
         # Vista pública/deslogueada de FB (no son posts, son el encabezado del grupo
         # y el muro de login que aparece cuando la cookie de sesión está vencida).
         "Información sobre este grupo", "Hay más contenido para ver",
         "Iniciar sesión", "Inicia sesión", "Crear cuenta nueva",
+    )
+
+    # Marcas del encabezado/about del grupo: si aparecen en cualquier parte de un
+    # item, es la vista pública (deslogueada), no un post real. Se chequean sobre
+    # TODO el texto del item, no solo el comienzo.
+    _GROUP_HEADER_MARKERS = (
+        "miembros", "Unirse al grupo", "Unirte al grupo",
     )
 
     # Señales de que FB sirvió la vista DESLOGUEADA (cookie vencida/inválida):
@@ -729,6 +736,12 @@ class FacebookGroupScraper:
         for art in articles:
             raw = art.get_text(" ", strip=True)
             if not raw or any(ui in raw[:80] for ui in self._UI_NOISE):
+                continue
+            # Encabezado/about del grupo (vista pública deslogueada): si aparecen
+            # estas marcas en CUALQUIER parte del item, no es un post real. Esto
+            # evita guardar "<Grupo> · N miembros · Unirse al grupo" como si fuera
+            # un alquiler (donde el precio terminaba siendo el nº de miembros).
+            if any(m in raw for m in self._GROUP_HEADER_MARKERS):
                 continue
             text = self._clean_post_text(raw)
             if len(text) < 25:
