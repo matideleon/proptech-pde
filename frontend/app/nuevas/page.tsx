@@ -15,7 +15,7 @@ function NuevasContent() {
     queryKey: ["nuevas-properties"],
     queryFn: () =>
       propertiesApi
-        .list({ sort_by: "created_at", sort_order: "desc", page_size: 24 })
+        .list({ sort_by: "created_at", sort_order: "desc", page_size: 100, days_ago: 7 })
         .then((r) => r.data),
   });
 
@@ -31,7 +31,7 @@ function NuevasContent() {
             <p className="text-sm text-muted-foreground">
               {isLoading
                 ? "Cargando..."
-                : `${formatNumber(data?.total)} propiedades, las mas recientes primero`}
+                : `${formatNumber(data?.total)} propiedades en los últimos 7 días`}
             </p>
           </div>
         </div>

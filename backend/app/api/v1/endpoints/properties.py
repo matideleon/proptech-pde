@@ -47,6 +47,7 @@ async def list_properties(
     neighborhood: Optional[List[str]] = Query(None),
     ai_premium: Optional[bool] = Query(None),
     ai_opportunity: Optional[bool] = Query(None),
+    days_ago: Optional[int] = Query(None, ge=1, le=365, description="Solo propiedades de los últimos N días"),
     sort_by: str = Query("created_at", pattern="^(created_at|price|ai_score|area_total|price_per_m2_usd)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
@@ -106,6 +107,11 @@ async def list_properties(
 
     if ai_opportunity is not None:
         filters.append(Property.ai_opportunity == ai_opportunity)
+
+    if days_ago is not None:
+        from datetime import datetime, timedelta, timezone
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days_ago)
+        filters.append(Property.created_at >= cutoff)
 
     # Búsqueda de texto: full-text (tsvector) en Postgres, LIKE en SQLite
     if q:
